@@ -1,0 +1,34 @@
+/* ==========================================================================
+   Emoji / sticker / GIF sheet.
+   ========================================================================== */
+.emoji-picker{display:none;position:absolute;bottom:76px;inset-inline-start:12px;width:380px;max-width:calc(100% - 24px);height:420px;max-height:60vh;overflow:hidden;flex-direction:column;
+    z-index:40;border-radius:var(--md-sys-shape-xl);background:var(--md-sys-color-surface-container);box-shadow:var(--md-elev-3);transform-origin:bottom left}
+.emoji-picker.show{display:flex;animation:md-menu-in var(--md-dur-m2) var(--md-ease-emph-decel)}
+
+.emoji-cats{height:52px;flex-shrink:0;display:flex;align-items:center;gap:2px;padding:0 8px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--md-sys-color-outline-variant)}
+.emoji-cats::-webkit-scrollbar{display:none}
+.ec{font-size:1.2rem;cursor:pointer;padding:6px 10px;border-radius:var(--md-sys-shape-full);flex-shrink:0;opacity:.7;font:var(--md-type-label-large);
+    transition:background var(--md-dur-s4) var(--md-ease-standard),opacity var(--md-dur-s4) var(--md-ease-standard)}
+.ec.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);opacity:1}
+
+.emoji-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;padding:8px;align-content:start}
+.emoji-grid span{font-size:1.4rem;cursor:pointer;padding:6px;border-radius:var(--md-sys-shape-md);text-align:center;transition:background var(--md-dur-s3) var(--md-ease-standard),transform var(--md-dur-s4) var(--md-ease-emph-decel)}
+.emoji-grid span:hover{background:color-mix(in srgb,var(--md-sys-color-on-surface) 10%,transparent);transform:scale(1.14)}
+
+.sk-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px;align-content:start}
+.sk-tile{aspect-ratio:1;border-radius:var(--md-sys-shape-md);background:var(--md-sys-color-surface-container-high);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;
+    transition:transform var(--md-dur-s4) var(--md-ease-emph-decel)}
+.sk-tile:hover{transform:scale(1.05)}
+.sk-tile img,.sk-tile video,.sk-tile svg{width:100%!important;height:100%!important;object-fit:contain}
+.sk-tile .emo-fallback{font-size:2rem}
+.sk-tile .sticker-fallback{width:100%;height:100%}
+.sk-empty{grid-column:1/-1;text-align:center;color:var(--md-sys-color-on-surface-variant);font:var(--md-type-body-medium);padding:32px 0}
+
+/* twemoji renders unicode emoji as <img class="emoji"> */
+img.emoji{height:1.25em;width:1.25em;vertical-align:-.2em;margin:0 .03em 0 .1em}
+.emoji-grid img.emoji,.react-quick img.emoji,.react-grid img.emoji,.sk-tab img.emoji{height:1.4em;width:1.4em;margin:0}
+.ec img.emoji{height:1.1em;width:1.1em}
+
+@media(max-width:768px){
+    .emoji-picker{width:auto;inset-inline:8px;bottom:72px;transform-origin:bottom center}
+}

@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Icons — Material Symbols (Rounded).
+   The app's markup/JS addresses icons as <i class="bi bi-name">. Rather than
+   rewrite every call site, each legacy name is mapped here to a Material
+   Symbols ligature, so the markup stays untouched and the icon set is M3.
+   The font is loaded (as a small subset) by the <link> in index.html.
+   ========================================================================== */
+.bi{
+    display:inline-block;width:1em;height:1em;line-height:1;overflow:hidden;
+    vertical-align:-.15em;flex-shrink:0;font-style:normal;text-align:center;
+}
+.bi::before{
+    font-family:'Material Symbols Rounded';font-weight:400;font-style:normal;
+    font-size:inherit;line-height:1;letter-spacing:normal;text-transform:none;
+    display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;
+    -webkit-font-smoothing:antialiased;font-feature-settings:'liga';
+    font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;
+    transition:font-variation-settings var(--md-dur-s4) var(--md-ease-standard);
+}
+/* filled variants */
+.bi-pin-angle-fill::before,.bi-bell-slash-fill::before,.bi-send-fill::before,.bi-mic-fill::before,
+.bi-play-fill::before,.bi-pause-fill::before,.bi-reply-fill::before,.bi-people-fill::before,
+.bi-briefcase-fill::before{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+
+.bi-add::before,.bi-plus-lg::before{content:"add"}
+.bi-arrow-right::before{content:"arrow_back"}                  /* "back" — flipped for RTL below */
+.bi-arrow-90deg-left::before{content:"shortcut"}
+.bi-ban::before,.bi-slash-circle::before{content:"block"}
+.bi-bell::before{content:"notifications"}
+.bi-bell-slash::before,.bi-bell-slash-fill::before{content:"notifications_off"}
+.bi-box-arrow-right::before{content:"logout"}
+.bi-briefcase-fill::before{content:"work"}
+.bi-camera::before{content:"photo_camera"}
+.bi-camera-video::before{content:"videocam"}
+.bi-card-heading::before{content:"badge"}
+.bi-chat-square-dots::before{content:"chat"}
+.bi-check-circle::before{content:"check_circle"}
+.bi-chevron-down::before{content:"keyboard_arrow_down"}
+.bi-chevron-left::before{content:"chevron_right"}              /* "forward" — flipped for RTL below */
+.bi-clipboard::before{content:"content_copy"}
+.bi-download::before,.bi-file-earmark-arrow-down::before{content:"download"}
+.bi-emoji-smile::before{content:"mood"}
+.bi-file-earmark::before{content:"description"}
+.bi-film::before{content:"gif_box"}
+.bi-forward::before{content:"forward"}
+.bi-funnel::before{content:"filter_list"}
+.bi-image::before{content:"image"}
+.bi-info-circle::before{content:"info"}
+.bi-key::before{content:"key"}
+.bi-list::before{content:"menu"}
+.bi-magic::before{content:"auto_fix_high"}
+.bi-mic-fill::before{content:"mic"}
+.bi-mic-mute::before{content:"mic_off"}
+.bi-paperclip::before{content:"attach_file"}
+.bi-pause-fill::before{content:"pause"}
+.bi-pause-circle::before{content:"pause_circle"}
+.bi-pencil::before{content:"edit"}
+.bi-pencil-square::before{content:"edit_square"}
+.bi-people::before,.bi-people-fill::before{content:"group"}
+.bi-person-gear::before{content:"manage_accounts"}
+.bi-person-plus::before{content:"person_add"}
+.bi-person-x::before{content:"person_remove"}
+.bi-pin-angle::before,.bi-pin-angle-fill::before{content:"keep"}
+.bi-play-fill::before{content:"play_arrow"}
+.bi-play-circle::before{content:"play_circle"}
+.bi-reply::before,.bi-reply-fill::before{content:"reply"}
+.bi-robot::before{content:"smart_toy"}
+.bi-search::before{content:"search"}
+.bi-send-fill::before{content:"send"}
+.bi-shield-check::before{content:"verified_user"}
+.bi-stickies::before{content:"sticky_note_2"}
+.bi-telegram::before{content:"send"}
+.bi-trash3::before{content:"delete"}
+.bi-x-lg::before{content:"close"}
+.bi-devices::before{content:"devices"}
+.bi-globe::before{content:"language"}
+.bi-install::before{content:"install_mobile"}
+.bi-android2::before{content:"android"}
+.bi-windows::before{content:"desktop_windows"}
+/* status icons used by snackbars / banners */
+.bi-error::before{content:"error"}
+.bi-warning::before{content:"warning"}
+.bi-done::before{content:"done"}
+
+/* direction-aware glyphs: the base glyph points the LTR way, mirror in RTL */
+html[dir="rtl"] .bi-arrow-right::before,
+html[dir="rtl"] .bi-chevron-left::before,
+html[dir="rtl"] .bi-arrow-90deg-left::before,
+html[dir="rtl"] .bi-reply::before,html[dir="rtl"] .bi-reply-fill::before,
+html[dir="rtl"] .bi-forward::before,
+html[dir="rtl"] .bi-send-fill::before,
+html[dir="rtl"] .bi-telegram::before{transform:scaleX(-1)}

@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <script>try{if(localStorage.getItem("TG_PASS"))document.documentElement.classList.add("has-session")}catch(e){}</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Telegram Web Admin</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#10131a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="icon" type="image/svg+xml" href="/icon.svg">
+    <link rel="apple-touch-icon" href="/icon.svg">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Material Symbols (Rounded), loaded as a small subset of just the icons the app uses.
+         If you add an icon, add its name here (alphabetical) and map it in static/css/icons.css -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=add,android,arrow_back,attach_file,auto_fix_high,badge,block,chat,check_circle,chevron_right,close,content_copy,delete,description,desktop_windows,devices,done,download,edit,edit_square,error,filter_list,forward,gif_box,group,image,info,install_mobile,keep,key,keyboard_arrow_down,language,logout,manage_accounts,menu,mic,mic_off,mood,movie,notifications,notifications_off,pause,pause_circle,person_add,person_remove,photo_camera,play_arrow,play_circle,reply,search,send,shortcut,smart_toy,sticky_note_2,verified_user,videocam,warning,work&display=block" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Material Design 3: tokens → icons → base primitives → components -->
+    <link href="/static/css/variables.css" rel="stylesheet">
+    <link href="/static/css/icons.css" rel="stylesheet">
+    <link href="/static/css/base.css" rel="stylesheet">
+    <link href="/static/css/sidebar.css" rel="stylesheet">
+    <link href="/static/css/chatlist.css" rel="stylesheet">
+    <link href="/static/css/topbar.css" rel="stylesheet">
+    <link href="/static/css/bubble.css" rel="stylesheet">
+    <link href="/static/css/composer.css" rel="stylesheet">
+    <link href="/static/css/emoji.css" rel="stylesheet">
+    <link href="/static/css/settings.css" rel="stylesheet">
+</head>
+<body>
+    <!-- shown (instead of the sign-in form) while a stored session is re-validated — see html.has-session in settings.css -->
+    <div class="splash" id="splash" aria-hidden="true">
+        <div class="brand-orb"><i class="bi bi-telegram"></i></div>
+        <div class="splash-status"><span class="spinner-border spinner-border-sm"></span><span id="splashText">در حال بارگذاری…</span></div>
+    </div>
+    <div id="authBox" class="container h-100 d-flex justify-content-center align-items-center">
+        <div class="auth-card text-center">
+            <div class="brand-orb mx-auto mb-3"><i class="bi bi-telegram"></i></div>
+            <h5 class="mb-1 fw-bold">پنل مدیریت تلگرام</h5>
+            <!-- login mode -->
+            <div id="authLogin">
+                <p class="text-secondary small mb-3">برای ورود، یوزرنیم و رمز عبور را وارد کن</p>
+                <div id="authSuspended" class="auth-suspended d-none"><i class="bi bi-slash-circle"></i> این یوزر تعلیق شده است. با مدیر تماس بگیر.</div>
+                <input type="text" id="userInput" class="form-control mb-2 text-center" placeholder="یوزرنیم" autocomplete="username">
+                <input type="password" id="passInput" class="form-control mb-3 text-center" placeholder="رمز عبور" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+                <button class="btn btn-primary w-100 py-2" onclick="login()">ورود</button>
+                <a class="auth-link" onclick="showAuthMode('forgot')">فراموشی رمز عبور</a>
+            </div>
+            <!-- forgot mode -->
+            <div id="authForgot" class="d-none">
+                <p class="text-secondary small mb-3">یوزرنیمت را بنویس؛ ربات خودت یک رمز موقت برای تلگرامِ صاحب حساب می‌فرستد (باید قبلاً یک‌بار ربات را /start کرده باشی).</p>
+                <input type="text" id="forgotUser" class="form-control mb-3 text-center" placeholder="یوزرنیم">
+                <button class="btn btn-primary w-100 py-2" onclick="requestReset()">ارسال رمز موقت به تلگرام</button>
+                <a class="auth-link" onclick="showAuthMode('login')">بازگشت به ورود</a>
+            </div>
+            <!-- forced change: shown after logging in with a one-time recovery password -->
+            <div id="authForce" class="d-none">
+                <p class="text-secondary small mb-3">با رمز موقت وارد شدی. یک رمز عبور جدید انتخاب کن (حداقل ۶ کاراکتر).</p>
+                <input type="password" id="forceNew1" class="form-control mb-2 text-center" placeholder="رمز جدید" autocomplete="new-password">
+                <input type="password" id="forceNew2" class="form-control mb-3 text-center" placeholder="تکرار رمز جدید" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitForcedChange()">
+                <button class="btn btn-primary w-100 py-2" onclick="submitForcedChange()">ذخیره و ورود</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="mainApp" class="app d-none">
+        <!-- Settings overlay -->
+        <!-- Phase 6: real multi-page settings (main list → sub-pages),
+             instead of one long flat page — matches the actual Telegram
+             app's Settings screen structure. Sub-page navigation goes
+             through the same back-stack as everything else (pushUiState),
+             so the device back button steps out of a sub-page one level
+             at a time instead of leaving settings entirely. -->
+        <div class="settings-page" id="settingsPage">
+            <!-- main list -->
+            <div class="sp-view" id="spMain">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>تنظیمات</h5>
+                </div>
+                <div class="sp-body">
+                    <div class="sp-list-row owner-only d-none" onclick="openSettingsSub('users')"><i class="bi bi-people"></i><span>کاربران پنل</span><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row" onclick="openSettingsSub('ai')"><i class="bi bi-robot"></i><span>هوش مصنوعی</span><small id="spAiSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row" onclick="openSettingsSub('panel')"><i class="bi bi-person-gear"></i><span>پنل و اعلان‌ها</span><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row" onclick="openSettingsSub('devices')"><i class="bi bi-devices"></i><span>دستگاه‌های وارد شده</span><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row" onclick="openSettingsSub('bot')"><i class="bi bi-pencil-square"></i><span>پروفایل ربات</span><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row" onclick="openSettingsSub('about')"><i class="bi bi-info-circle"></i><span>درباره</span><i class="bi bi-chevron-left arrow"></i></div>
+                    <div class="sp-list-row tenant-only d-none" onclick="changePasswordDialog()"><i class="bi bi-key"></i><span>تغییر رمز عبور</span></div>
+                    <div class="sp-list-row" onclick="logout()"><i class="bi bi-box-arrow-right" style="background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)"></i><span style="color:var(--md-sys-color-error)">خروج از حساب</span></div>
+                </div>
+            </div>
+
+            <!-- Users sub-page (owner only): everything /signup, /setbot, /resetpass,
+                 /suspend, /deleteuser do from the admin group, as a GUI -->
+            <div class="sp-view sp-sub" id="spUsers" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>کاربران پنل</h5>
+                </div>
+                <div class="sp-body">
+                    <div id="uBaseWarn" class="alert alert-warning py-2 d-none" style="font-size:.8rem">متغیر <code>PUBLIC_BASE_URL</code> روی Space تنظیم نشده؛ تا تنظیم نشه نمی‌شه ربات کاربر را وصل کرد.</div>
+                    <div class="sp-card">
+                        <div class="u-form-title"><i class="bi bi-person-plus"></i> کاربر جدید</div>
+                        <input id="uName" class="form-control mb-2" placeholder="یوزرنیم (لاتین، ۳ تا ۳۲ کاراکتر)" autocomplete="off">
+                        <div class="d-flex gap-2 mb-2">
+                            <input id="uPass" class="form-control" placeholder="رمز عبور (حداقل ۶ کاراکتر)" autocomplete="new-password">
+                            <button class="btn btn-outline-secondary" type="button" title="تولید رمز تصادفی" onclick="document.getElementById('uPass').value=genPass()"><i class="bi bi-magic"></i></button>
+                        </div>
+                        <input id="uTgId" class="form-control mb-2" placeholder="آیدی عددی تلگرام صاحب حساب (برای بازیابی رمز)" autocomplete="off" inputmode="numeric">
+                        <button class="btn btn-primary w-100" onclick="createUser()">ساخت حساب</button>
+                    </div>
+                    <div class="u-form-title mt-3"><i class="bi bi-people"></i> حساب‌ها</div>
+                    <div id="uList"></div>
+                </div>
+            </div>
+
+            <!-- AI sub-page -->
+            <div class="sp-view sp-sub" id="spAi" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>هوش مصنوعی</h5>
+                </div>
+                <div class="sp-body">
+                    <div class="sp-card">
+                        <div class="sp-row">
+                            <label for="gAiToggle">فعال‌سازی کلی AI</label>
+                            <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gAiToggle"></div>
+                        </div>
+                        <div class="sp-row">
+                            <label>کلید API گوگل (AI Studio)</label>
+                            <span><input id="gGeminiKey" type="password" class="sp-inp" style="width:190px" autocomplete="new-password"> <button class="u-btn danger" type="button" onclick="clearGeminiKey()">حذف</button></span>
+                        </div>
+                        <div class="text-secondary" id="gGeminiHint" style="font:var(--md-type-body-small)"></div>
+                        <div class="sp-row">
+                            <label>مدل زبانی</label>
+                            <input id="gModel" class="sp-inp" style="width:200px" placeholder="gemini-2.5-flash">
+                        </div>
+                        <div class="sp-row">
+                            <label>تأخیر پاسخ دسته‌ای (ثانیه)</label>
+                            <input id="gDelay" type="number" class="sp-inp" style="width:80px" min="5" max="120">
+                        </div>
+                        <div>
+                            <label class="form-label">پرامپت پیش‌فرض</label>
+                            <textarea id="gPrompt" class="form-control" rows="6" placeholder="پرامپت مادر..."></textarea>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+                </div>
+            </div>
+
+            <!-- Panel sub-page -->
+            <div class="sp-view sp-sub" id="spPanel" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>پنل و اعلان‌ها</h5>
+                </div>
+                <div class="sp-body">
+                    <div class="sp-card">
+                        <div class="sp-row">
+                            <label>آیدی عددی تلگرام شما (تشخیص پیام‌های خودتان + بازیابی رمز)</label>
+                            <input id="gOwnerId" class="sp-inp" style="width:150px" placeholder="12345678">
+                        </div>
+                        <div class="sp-row">
+                            <label>پک‌های استیکر پنل (نام کوتاه، با کاما جدا کن)</label>
+                            <input id="gStickerPacks" class="sp-inp" style="width:220px" placeholder="MyStickerSet, AnotherPack">
+                        </div>
+                        <div class="sp-row">
+                            <label>نرخ بروزرسانی (میلی‌ثانیه)</label>
+                            <input id="gPoll" type="number" class="sp-inp" style="width:100px" min="500">
+                        </div>
+                        <div class="sp-row tenant-only d-none">
+                            <label>آیدی گروه ادمین (برای /send_msg و گزارش خطا)</label>
+                            <span><input id="gAdminGroup" class="sp-inp" style="width:150px" placeholder="-1001234567890" autocomplete="off"> <button class="u-btn primary" type="button" onclick="testAdminGroup()">تست</button></span>
+                        </div>
+                        <div class="sp-row">
+                            <label>فعال‌سازی اعلان پس‌زمینه</label>
+                            <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gPushToggle" onchange="togglePushNotifications(this.checked)"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+                </div>
+            </div>
+
+            <!-- Bot profile sub-page -->
+            <div class="sp-view sp-sub" id="spBot" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>پروفایل ربات</h5>
+                </div>
+                <div class="sp-body">
+                    <div id="bpNoBot" class="alert alert-warning py-2 d-none" style="font-size:.8rem"></div>
+                    <div class="bp-head">
+                        <div class="bp-avatar"><img id="bpPhoto" alt="" class="d-none"><i class="bi bi-robot" id="bpPhotoFallback"></i></div>
+                        <div class="bp-info">
+                            <div class="bp-name" id="bpName">—</div>
+                            <div class="bp-meta" dir="ltr" id="bpUser"></div>
+                            <div class="bp-meta" dir="ltr" id="bpId"></div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mb-3 justify-content-center">
+                        <button class="u-btn primary" type="button" onclick="document.getElementById('bpFile').click()"><i class="bi bi-camera"></i> تغییر عکس</button>
+                        <button class="u-btn danger" type="button" onclick="removeBotPhoto()"><i class="bi bi-trash3"></i> حذف عکس</button>
+                        <input type="file" id="bpFile" accept="image/*" class="d-none" onchange="uploadBotPhoto(this)">
+                    </div>
+                    <div class="sp-card">
+                        <label class="bp-label">نام ربات</label>
+                        <input id="bName" class="form-control mb-2" placeholder="نام ربات">
+                        <label class="bp-label">توضیحات کوتاه</label>
+                        <textarea id="bShort" class="form-control mb-2" rows="2" placeholder="توضیحات کوتاه (روی صفحه‌ی پروفایل ربات)"></textarea>
+                        <label class="bp-label">توضیحات کامل</label>
+                        <textarea id="bDesc" class="form-control" rows="4" placeholder="توضیحات کامل (وقتی چت خالی است)"></textarea>
+                    </div>
+                    <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+                </div>
+            </div>
+
+            <!-- Signed-in devices: every browser / app session of this account -->
+            <div class="sp-view sp-sub" id="spDevices" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>دستگاه‌های وارد شده</h5>
+                </div>
+                <div class="sp-body">
+                    <p class="text-secondary mb-3" style="font:var(--md-type-body-medium)">مرورگرها و اپ‌هایی که با حساب تو وارد شده‌اند. اسم هر کدام را عوض کن تا راحت‌تر تشخیصشان بدهی، و دستگاهی را که نمی‌شناسی خارج کن.</p>
+                    <div id="devList"></div>
+                </div>
+            </div>
+
+            <!-- About sub-page -->
+            <div class="sp-view sp-sub" id="spAbout" style="display:none">
+                <div class="sp-hdr">
+                    <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+                    <h5>درباره</h5>
+                </div>
+                <div class="sp-body">
+                    <div class="sp-card text-center py-4">
+                        <div class="brand-orb mx-auto mb-2"><i class="bi bi-telegram"></i></div>
+                        <h6 class="fw-bold mb-1">Telegram Web Admin</h6>
+                        <div class="text-secondary" style="font-size:.82rem">پنل مدیریت ربات/بیزینس تلگرام با ظاهر Telegram Web K</div>
+                    </div>
+                    <div class="sp-card mt-3" id="spAboutDetails">
+                        <div class="sp-row"><label>مدل زبانی فعال</label><span id="spAboutModel" class="text-secondary"></span></div>
+                        <div class="sp-row"><label>وضعیت AI</label><span id="spAboutAiState" class="text-secondary"></span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar (Phase 1: real tweb structure — sidebar-header, view
+             switcher, folder tabs, ul.chatlist) -->
+        <div class="sidebar" id="sidebar">
+            <div>
+                <div class="sidebar-header">
+                    <div class="search-bar">
+                        <button class="icon-btn" onclick="openSettings()" title="تنظیمات" aria-label="تنظیمات"><i class="bi bi-list"></i></button>
+                        <input type="text" id="searchInput" placeholder="جستجو" oninput="filterChats()" aria-label="جستجو">
+                        <i class="bi bi-search search-ico"></i>
+                    </div>
+                </div>
+                <!-- connection state (ws.js): connecting / waiting for network / updating -->
+                <div class="conn-status" id="connStatus" role="status" aria-live="polite"><span class="spinner-border spinner-border-sm"></span><span id="connText"></span></div>
+                <div class="view-switcher">
+                    <div class="view-btn active" data-view="bot" onclick="switchView('bot')"><i class="bi bi-robot"></i> ربات <span class="vb-badge d-none" id="vbBotCount">0</span></div>
+                    <div class="view-btn" data-view="biz" onclick="switchView('biz')"><i class="bi bi-telegram"></i> تلگرام <span class="vb-badge d-none" id="vbBizCount">0</span></div>
+                </div>
+                <div class="folder-tabs">
+                    <div class="ftab active" data-tab="all" onclick="setTab('all')">همه <span class="cnt" id="cntAll">0</span></div>
+                    <div class="ftab" data-tab="unread" onclick="setTab('unread')">خوانده‌نشده <span class="cnt" id="cntUnread">0</span></div>
+                    <div class="ftab" data-tab="pinned" onclick="setTab('pinned')">پین‌شده <span class="cnt" id="cntPinned">0</span></div>
+                    <div class="ftab" data-tab="groups" onclick="setTab('groups')">گروه‌ها <span class="cnt" id="cntGroups">0</span></div>
+                </div>
+            </div>
+            <ul class="chatlist" id="chatList"></ul>
+            <button class="fab" onclick="openNewChatModal()" title="چت جدید" aria-label="چت جدید"><i class="bi bi-pencil"></i></button>
+        </div>
+
+        <!-- Main chat area -->
+        <div class="chat-main" id="chatMain">
+            <div id="noChat" class="h-100 d-flex flex-column align-items-center justify-content-center text-secondary">
+                <div class="brand-orb mb-3" style="opacity:.4"><i class="bi bi-chat-square-dots"></i></div>
+                <p>یک گفتگو را برای شروع انتخاب کنید</p>
+            </div>
+
+            <div id="chatBox" class="d-none h-100 flex-column">
+                <!-- Header (Phase 2: real tweb structure — chat-topbar /
+                     chat-info-container / person-avatar / user-title) -->
+                <div class="chat-topbar">
+                    <div class="chat-info-container" onclick="showProfileModal()" title="پروفایل">
+                        <button class="icon-btn d-md-none" onclick="event.stopPropagation();handleBackButton()"><i class="bi bi-arrow-right"></i></button>
+                        <div class="person-avatar" id="hdrAv">ت</div>
+                        <div class="chat-info-text">
+                            <h6 class="user-title text-truncate" id="hdrTitle">مخاطب</h6>
+                            <div class="chat-info-subtitle" id="hdrSub">شناسه</div>
+                        </div>
+                    </div>
+                    <!-- Pin/mute/AI-settings/delete/user-info now live inside
+                         the profile modal (tap the name/avatar above) so the
+                         topbar stays just back+avatar+name — the full
+                         contact name stays readable even on small screens. -->
+                    <div class="chat-utils">
+                        <!-- Phase 5: opens the same group-info modal as
+                             tapping the avatar/name — group management now
+                             lives there (Members + مدیریت گروه), not in a
+                             separate topbar toolbar. -->
+                        <button class="icon-btn" id="gmodToggleBtn" onclick="showProfileModal()" title="اطلاعات و مدیریت گروه" style="display:none"><i class="bi bi-shield-check"></i></button>
+                    </div>
+                </div>
+
+                <div class="msgs" id="msgs"></div>
+
+                <div id="scrollBtn" class="scroll-btn d-none" onclick="scrollBot(true)">
+                    <i class="bi bi-chevron-down"></i>
+                    <span id="ubadge" class="ubadge d-none">0</span>
+                </div>
+
+                <!-- Emoji picker -->
+                <div class="emoji-picker" id="emojiPicker">
+                    <div class="emoji-cats" id="emojiCats"></div>
+                    <div class="emoji-grid" id="emojiGrid"></div>
+                </div>
+
+                <!-- Sticker/GIF panel. The Bot API can't browse/search all
+                     stickers (MTProto-only feature) — only sets the admin
+                     names (Settings → sticker packs) plus whatever's been
+                     sent before (tracked as "recent"). -->
+                <div class="emoji-picker" id="stickerPicker">
+                    <div class="emoji-cats">
+                        <span class="ec sk-tab active" data-tab="sticker" onclick="switchStickerTab('sticker')">🎭 استیکر</span>
+                        <span class="ec sk-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 گیف</span>
+                    </div>
+                    <div class="sk-grid" id="stickerGrid">
+                        <div class="sk-empty" id="stickerEmpty">موردی نیست</div>
+                    </div>
+                </div>
+
+                <!-- Composer -->
+                <div class="comp-wrap">
+                    <div class="rstrip" id="rstrip">
+                        <div class="d-flex align-items-center gap-2 flex-1" style="min-width:0">
+                            <i class="bi bi-reply-fill" style="color:var(--md-sys-color-primary)"></i>
+                            <span class="txt" id="rstripTxt"></span>
+                        </div>
+                        <i class="bi bi-x-lg" style="cursor:pointer" onclick="cancelReply()"></i>
+                    </div>
+                    <!-- Phase 3: real tweb recording pill — cancel(×), a
+                         blinking-dot + timer pill, and an always-visible
+                         send button (previously recording only offered a
+                         text "لغو" link with no way to actually send). -->
+                    <div class="voice-rec-panel" id="voiceRecPanel">
+                        <div class="voice-rec-cancel" onclick="cancelRec()" title="لغو ضبط"><i class="bi bi-trash3"></i></div>
+                        <div class="voice-rec-pill">
+                            <span class="voice-rec-dot"></span>
+                            <span class="voice-rec-label">در حال ضبط پیام صوتی...</span>
+                            <span class="voice-rec-timer" id="voiceRecTimer">0:00</span>
+                        </div>
+                        <div class="voice-rec-send" onclick="stopRec(true)" title="ارسال"><i class="bi bi-send-fill" style="font-size:.85rem"></i></div>
+                    </div>
+                    <div class="comp-dock">
+                        <div class="inp-row" id="inpRow">
+                            <div style="position:relative">
+                                <button class="icon-btn" id="attBtn"><i class="bi bi-paperclip"></i></button>
+                                <div class="att-menu" id="attMenu">
+                                    <div class="opt" onclick="pickFile('image/*','photo')"><i class="bi bi-image"></i> عکس</div>
+                                    <div class="opt" onclick="pickFile('video/*','video')"><i class="bi bi-camera-video"></i> ویدیو</div>
+                                    <div class="opt" onclick="pickFile('image/gif,video/mp4','animation')"><i class="bi bi-film"></i> GIF</div>
+                                    <div class="opt" onclick="pickFile('*','document')"><i class="bi bi-file-earmark"></i> فایل</div>
+                                </div>
+                            </div>
+                            <input type="file" id="fileIn" style="display:none">
+                            <button class="icon-btn" id="emojiBtn" onclick="toggleEmojiPicker()"><i class="bi bi-emoji-smile"></i></button>
+                            <button class="icon-btn" id="stickerBtn" onclick="toggleStickerPicker()"><i class="bi bi-stickies"></i></button>
+                            <textarea id="msgIn" class="form-control" rows="1" placeholder="پیام..."></textarea>
+                            <button class="icon-btn rec-btn" id="micBtn"><i class="bi bi-mic-fill"></i></button>
+                            <button class="send-btn d-none" id="sendBtn" onclick="sendMsg()"><i class="bi bi-send-fill"></i></button>
+                        </div>
+                        <!-- sender selector (only when Business connection available) -->
+                        <div id="senderSelector" style="display:none;padding:0 4px 4px;font-size:.78rem;color:var(--md-sys-color-on-surface-variant);display:none">
+                            ارسال به‌عنوان:
+                            <label style="margin-right:10px"><input type="radio" name="sender" value="bot" checked> ربات</label>
+                            <label><input type="radio" name="sender" value="me"> من</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- chat AI settings panel -->
+    </div>
+
+    <!-- AI panel — a normal modal now (same size as the profile modal),
+         opened FROM the profile modal; closing it (X, backdrop, Escape, or
+         the back-arrow) returns to the profile modal instead of just
+         vanishing, matching how it was reached. -->
+    <div class="modal fade" id="chatSP" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white">
+                <div class="modal-header border-secondary">
+                    <button class="icon-btn me-2" onclick="bootstrap.Modal.getInstance(document.getElementById('chatSP')).hide()"><i class="bi bi-arrow-right"></i></button>
+                    <h5 class="modal-title flex-grow-1"><i class="bi bi-robot"></i> تنظیمات AI این چت</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body d-flex flex-column gap-3">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="form-check form-switch fs-6 m-0">
+                            <input class="form-check-input" type="checkbox" id="csAi" onchange="updateCsStatus()">
+                            <label class="form-check-label" for="csAi">فعال‌سازی AI برای این چت</label>
+                        </div>
+                        <small id="csStatus" class="pa-sub"></small>
+                    </div>
+                    <div>
+                        <label class="text-secondary small d-block mb-1">پرامپت اختصاصی (خالی = پیش‌فرض)</label>
+                        <textarea id="csPrompt" class="form-control" rows="10" placeholder="دستورالعمل اختصاصی..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveChatSettings()">ذخیره</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- new chat modal -->
+    <div class="modal fade" id="newChatModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-person-plus"></i> چت جدید</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label small text-secondary">آیدی / یوزرنیم</label>
+                    <input type="text" id="ncId" class="form-control mb-3" placeholder="123456789 یا @username">
+                    <label class="form-label small text-secondary">متن اولین پیام</label>
+                    <textarea id="ncMsg" class="form-control" rows="3" placeholder="سلام..."></textarea>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button class="btn btn-primary w-100" onclick="startNewChat()">ارسال و شروع چت</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- profile modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title"><i class="bi bi-card-heading"></i> پروفایل</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="profileBody">
+                    <div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>
+                </div>
+                <!-- actions moved here from the topbar -->
+                <div class="profile-actions" id="profileActions">
+                    <button class="pa-btn" id="paPin" onclick="profileTogglePin()"><i class="bi bi-pin-angle"></i><span>پین گفتگو</span></button>
+                    <button class="pa-btn" id="paMute" onclick="profileToggleMute()"><i class="bi bi-bell"></i><span>بی‌صدا کردن</span></button>
+                    <button class="pa-btn" onclick="openChatSettingsFromProfile()"><i class="bi bi-robot"></i><span>پنل AI</span><small class="pa-sub" id="paAiStatus"></small></button>
+                    <button class="pa-btn danger" onclick="deleteCurrentChat()"><i class="bi bi-trash3"></i><span>حذف گفتگو</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- gmod modals -->
+    <!-- in-app photo/video lightbox — avoids window.open(), which on an
+         installed PWA navigates the whole app out to the system browser -->
+    <!-- Phase 4: message context menu — right-click (desktop) or
+         long-press (touch) on a bubble; built dynamically in chat.js -->
+    <div class="msg-ctx-menu" id="msgCtxMenu">
+        <div class="mcm-react" id="mcmReact"></div>
+        <div class="mcm-items" id="mcmItems"></div>
+    </div>
+
+    <!-- glass toast host (replaces every alert()) -->
+    <div class="toast-host" id="toastHost"></div>
+
+    <div class="modal fade" id="mediaViewerModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content bg-transparent border-0">
+                <button type="button" class="btn-close btn-close-white ms-auto m-2" data-bs-dismiss="modal" style="position:absolute;top:0;left:0;z-index:5"></button>
+                <div class="modal-body p-0 d-flex align-items-center justify-content-center">
+                    <img id="mvImg" class="d-none" style="max-width:100%;max-height:85vh;border-radius:var(--md-sys-shape-md)">
+                    <video id="mvVideo" class="d-none" controls autoplay style="max-width:100%;max-height:85vh;border-radius:var(--md-sys-shape-md)"></video>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="gmodModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-white">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="gmodModalTitle">عملیات گروه</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="gmodModalBody"></div>
+                <div class="modal-footer border-secondary">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">لغو</button>
+                    <button class="btn btn-primary" id="gmodModalOk">تأیید</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- animated (.tgs/Lottie) sticker support: pako un-gzips the raw file,
+         lottie-web renders the resulting JSON animation -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+    <!-- Renders emoji as consistent flat-design images instead of the
+         device's own emoji font (e.g. Samsung's), so everyone sees the
+         same emoji regardless of phone/OS. -->
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+    <!-- Phase 1: state + api + sidebar + chat-list, must load before the
+         remaining inline script below (chat/composer/settings/group-mod),
+         which still calls into them as plain globals. -->
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/ripple.js"></script>
+    <script src="/static/js/ws.js"></script>
+    <script src="/static/js/sidebar.js"></script>
+    <script src="/static/js/chatlist.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/composer.js"></script>
+    <script>
+    const QUICK_REACT = ["❤","👍","🔥","😁","😱","🤣"]; // top 6 most used
+    const ALL_REACT = ["❤","👍","👎","🔥","🥰","👏","😁","🤔","🤯","😱","🤬","😢","🎉","🤩","🤮","💩","🙏","👌","🕊","🤡","🥱","🥴","😍","🐳","❤‍🔥","🌚","🌭","💯","🤣","⚡","🍌","🏆","💔","🤨","😐","🍓","🍾","💋","🖕","😈","😴","😭","🤓","👻","👨‍💻","👀","🎃","🙈","😇","😨","🤝","✍","🤗","🫡","🎅","🎄","☃","💅","🤪","🗿","🆒","💘","🙉","🦄","😘","💊","🙊","😎","👾","🤷‍♂","🤷","🤷‍♀","😡"];
+
+    // Emoji picker data (categories)
+    // EMOJI_CATS/buildEmojiPicker/switchEmojiCat/renderEmojiCat/
+    // toggleEmojiPicker now live in static/js/composer.js (Phase 3).
+
+    window.onload=function(){applyEmojiImages(document.body);const ta=document.getElementById('msgIn');ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}});ta.addEventListener('input',syncSendMic);document.getElementById('msgs').addEventListener('scroll',handleScroll);document.getElementById('attBtn').addEventListener('click',e=>{e.stopPropagation();document.getElementById('attMenu').classList.toggle('show')});document.getElementById('fileIn').addEventListener('change',onFilePick);document.getElementById('micBtn').addEventListener('click',toggleRec);document.addEventListener('click',e=>{if(!e.target.closest('.react-bar')&&!e.target.closest('.tbb'))document.querySelectorAll('.react-bar.show').forEach(p=>p.classList.remove('show'));if(!e.target.closest('#attMenu')&&!e.target.closest('#attBtn'))document.getElementById('attMenu').classList.remove('show');if(!e.target.closest('#emojiPicker')&&!e.target.closest('#emojiBtn')){emojiOpen=false;document.getElementById('emojiPicker').classList.remove('show')}if(!e.target.closest('#stickerPicker')&&!e.target.closest('#stickerBtn')){stickerOpen=false;document.getElementById('stickerPicker').classList.remove('show')}})}
+
+    function notify(){try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;const c=new A(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(587.33,c.currentTime);o.frequency.exponentialRampToValueAtTime(880,c.currentTime+.12);g.gain.setValueAtTime(.15,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.28);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.28)}catch(e){}}
+    function atBot(){const m=document.getElementById('msgs');return(m.scrollHeight-m.scrollTop-m.clientHeight)<70}
+    // Always instant — no "smooth" option anymore. A smooth/animated
+    // jump to the bottom (especially on a long chat, where media still
+    // loading shifts the layout underneath it) is exactly the "scrolling
+    // in from way above, stuttering midway" effect that was reported;
+    // real Telegram just jumps straight there.
+    function scrollBot(){const m=document.getElementById('msgs');m.scrollTop=m.scrollHeight;unreadCnt=0;updUBadge();document.getElementById('scrollBtn').classList.add('d-none')}
+    function handleScroll(){const b=document.getElementById('scrollBtn');if(atBot()){b.classList.add('d-none');unreadCnt=0;updUBadge()}else b.classList.remove('d-none');const m=document.getElementById('msgs');if(m.scrollTop<120&&hasMoreOlder&&oldestLoadedId)loadOlderMessages()}
+    function updUBadge(){const u=document.getElementById('ubadge');if(unreadCnt>0){u.innerText=unreadCnt>99?'99+':unreadCnt;u.classList.remove('d-none')}else u.classList.add('d-none')}
+    function updGlobalUnread(){let t=0;Object.values(unreadPer).forEach(v=>t+=v);document.title=t>0?`(${t}) Telegram Web Admin`:'Telegram Web Admin'}
+    // Phase 6: settings is now a real list→sub-page stack, wired into the
+    // same back-stack as everything else (pushUiState/applyUiState/
+    // goBackOneLevel, defined in chat.js) so the device back button steps
+    // out of a sub-page first, then out of the settings list, instead of
+    // either doing nothing or leaving settings in one jump.
+    const SP_SUBS=['spAi','spPanel','spBot','spAbout','spUsers','spDevices'];
+    function showSettingsMain(){
+        document.getElementById('spMain').style.display='flex';
+        SP_SUBS.forEach(id=>document.getElementById(id).style.display='none');
+    }
+    function showSettingsSub(name){
+        const id='sp'+name.charAt(0).toUpperCase()+name.slice(1);
+        document.getElementById('spMain').style.display='none';
+        SP_SUBS.forEach(x=>document.getElementById(x).style.display=(x===id?'flex':'none'));
+        if(name==='about')refreshAboutPage();
+        if(name==='users')loadUsers();
+        if(name==='devices')loadDevices();
+        if(name==='bot')loadBotProfile();
+    }
+    function openSettings(){
+        pushUiState({level:'settings'});
+        document.getElementById('settingsPage').classList.add('show');
+        showSettingsMain();
+        refreshAiSummary();
+    }
+    function closeSettings(){document.getElementById('settingsPage').classList.remove('show')}
+    function openSettingsSub(name){
+        pushUiState({level:'settings-sub',sub:name});
+        showSettingsSub(name);
+    }
+    async function refreshAiSummary(){
+        const r=await apiFetch('/api/settings');
+        const el=document.getElementById('spAiSummary');
+        if(el&&r)el.textContent=r.ai_mode?'فعال':'غیرفعال';
+    }
+    async function refreshAboutPage(){
+        const r=await apiFetch('/api/settings');
+        if(!r)return;
+        document.getElementById('spAboutModel').textContent=r.gemini_model||'—';
+        document.getElementById('spAboutAiState').textContent=r.ai_mode?'فعال':'غیرفعال';
+    }
+
+
+    // Real accounts now: login() exchanges username+password for a SESSION
+    // TOKEN (POST /api/login) and PASS holds that token from then on — every
+    // other request/media URL already sends PASS, so nothing else changed.
+    // With no fields filled (page reload) it just re-validates the stored token.
+    function showAuthMode(mode){
+        document.getElementById('authLogin').classList.toggle('d-none',mode!=='login');
+        document.getElementById('authForgot').classList.toggle('d-none',mode!=='forgot');
+        document.getElementById('authForce').classList.toggle('d-none',mode!=='force');
+    }
+    // What this browser is, for the "signed-in devices" list (the user can rename it there).
+    function deviceInfo(){
+        const ua=navigator.userAgent;
+        const br=/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/SamsungBrowser/.test(ua)?'Samsung Internet':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'مرورگر';
+        const os=/Windows/.test(ua)?'Windows':/Android/.test(ua)?'Android':/iPhone|iPad|iPod/.test(ua)?'iOS':/Mac OS X/.test(ua)?'macOS':/Linux/.test(ua)?'Linux':'';
+        const pwa=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+        return{deviceName:br+(os?' · '+os:''),platform:pwa?'pwa':'web'};
+    }
+    // Start-up splash: visible from the very first paint when a session is stored (html.has-session);
+    // fades out once the app is ready, or is replaced by the sign-in form if the session turns out invalid.
+    function endSplash(showAuth){
+        const s=document.getElementById('splash');
+        if(showAuth){document.documentElement.classList.remove('has-session');document.getElementById('authBox').classList.remove('d-none')}
+        if(!s)return;
+        s.classList.add('leaving');
+        setTimeout(()=>{s.remove();if(!showAuth)document.documentElement.classList.remove('has-session')},260);
+    }
+    let _loginBusy=false;
+    async function login(){
+        if(_loginBusy)return;
+        _loginBusy=true;
+        try{await doLogin()}finally{_loginBusy=false}
+    }
+    async function doLogin(){
+        const u=document.getElementById('userInput').value.trim();
+        const p=document.getElementById('passInput').value;
+        document.getElementById('authSuspended').classList.add('d-none');
+        if(p){
+            let res;
+            try{res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,...deviceInfo()})})}
+            catch(e){showToast('اتصال به سرور برقرار نشد','error');return}
+            const d=await res.json().catch(()=>({}));
+            if(!res.ok){
+                if(d.suspended)document.getElementById('authSuspended').classList.remove('d-none');
+                else showToast(d.error||'ورود ناموفق بود','error');
+                return;
+            }
+            PASS=d.token;
+            if(d.must_change){          // logged in with a one-time recovery password
+                document.getElementById('passInput').value='';showAuthMode('force');return;
+            }
+            localStorage.setItem('TG_IS_OWNER',d.is_owner?'1':'');
+        }
+        const r=await apiFetch('/api/settings');
+        if(r===null){
+            // network problem, NOT a rejected session: a stored login must survive being offline
+            if(!p){document.getElementById('splashText').textContent='منتظر اتصال به شبکه…';setTimeout(login,2500)}
+            else showToast('اتصال به سرور برقرار نشد','error');
+            return;
+        }
+        if(r&&!r.error){
+            localStorage.setItem('TG_PASS',PASS);
+            document.getElementById('authBox').classList.add('d-none');
+            document.getElementById('mainApp').classList.remove('d-none');
+            const isOwner=!!localStorage.getItem('TG_IS_OWNER');
+            document.querySelectorAll('.owner-only').forEach(el=>el.classList.toggle('d-none',!isOwner));
+            document.querySelectorAll('.tenant-only').forEach(el=>el.classList.toggle('d-none',isOwner));
+            // every account's own settings fill the form — a form left blank would
+            // wipe the saved values (including the Telegram id) on the next save
+            document.getElementById('gAiToggle').checked=r.ai_mode;document.getElementById('gPrompt').value=r.system_prompt||'';
+            document.getElementById('gPoll').value=r.poll_interval||3000;document.getElementById('gModel').value=r.gemini_model||'gemini-2.5-flash';
+            document.getElementById('gDelay').value=r.batch_delay_seconds||28;document.getElementById('gOwnerId').value=r.owner_user_id||'';
+            document.getElementById('gStickerPacks').value=r.sticker_packs||'';
+            document.getElementById('gAdminGroup').value=r.admin_group_id||'';
+            const gk=document.getElementById('gGeminiKey');gk.value='';
+            gk.placeholder=r.has_gemini_api_key?'•••••• (ذخیره‌شده — خالی = بدون تغییر)':'کلید از aistudio.google.com/apikey';
+            document.getElementById('gGeminiHint').textContent=isOwner
+                ?'خالی = از کلید مشترک سرور (GEMINI_API_KEY) استفاده می‌شود.'
+                :'هر حساب کلید خودش را دارد؛ بدون کلید، هوش مصنوعی برای این حساب پاسخی نمی‌دهد.';
+            pollMs=r.poll_interval||3000;syncSendMic();startPoller();
+            endSplash(false);
+        }else{
+            localStorage.removeItem('TG_PASS');localStorage.removeItem('TG_IS_OWNER');PASS='';
+            endSplash(true);
+            if(p)showToast('ورود ناموفق بود','error');
+        }
+    }
+    window.addEventListener('online',()=>{if(document.getElementById('splash')&&PASS)login()});
+    async function submitForcedChange(){
+        const a=document.getElementById('forceNew1').value,b=document.getElementById('forceNew2').value;
+        if(a.length<6){showToast('رمز باید حداقل ۶ کاراکتر باشد','warn');return}
+        if(a!==b){showToast('تکرار رمز با رمز جدید یکی نیست','warn');return}
+        const res=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:PASS},body:JSON.stringify({newPassword:a})});
+        const d=await res.json().catch(()=>({}));
+        if(!res.ok){showToast(d.error||'خطا','error');return}
+        PASS=d.token;localStorage.setItem('TG_IS_OWNER','');
+        document.getElementById('forceNew1').value='';document.getElementById('forceNew2').value='';
+        showToast('رمز جدید ذخیره شد','success');
+        await login();
+    }
+    // voluntary change from Settings (needs the current password)
+    function changePasswordDialog(){
+        openGmodModal('تغییر رمز عبور',
+            `<input id="cpOld" type="password" class="form-control mb-2" placeholder="رمز فعلی" autocomplete="current-password"><input id="cpNew" type="password" class="form-control" placeholder="رمز جدید (حداقل ۶ کاراکتر)" autocomplete="new-password"><div class="text-secondary mt-2" style="font-size:.78rem">بعد از تغییر، از بقیه‌ی دستگاه‌ها خارج می‌شوی.</div>`,
+            async()=>{
+                const res=await fetch('/api/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:PASS},body:JSON.stringify({currentPassword:document.getElementById('cpOld').value,newPassword:document.getElementById('cpNew').value})});
+                const d=await res.json().catch(()=>({}));
+                if(!res.ok){showToast(d.error||'خطا','error',4000);return}
+                PASS=d.token;localStorage.setItem('TG_PASS',PASS);closeGmod();showToast('رمز عبور تغییر کرد','success');
+            });
+    }
+    async function clearGeminiKey(){
+        if(!confirm('کلید Gemini این حساب حذف شود؟'))return;
+        const res=await apiFetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear_gemini_api_key:true})});
+        if(res&&res.success){document.getElementById('gGeminiKey').placeholder='کلید از aistudio.google.com/apikey';showToast('کلید حذف شد','success')}else showToast(res?.error||'خطا','error');
+    }
+    async function testAdminGroup(){
+        await adminCall('POST','/api/admin-group/test',{groupId:document.getElementById('gAdminGroup').value.trim()});
+    }
+
+    // ---------- bot profile: show current, change photo ----------
+    let botProfileOrig={};
+    async function loadBotProfile(){
+        const p=await apiFetch('/api/bot-profile');
+        const warn=document.getElementById('bpNoBot');
+        if(!p||p.error&&!p.connected&&p.connected!==false){warn.textContent='بارگذاری نشد';warn.classList.remove('d-none');return}
+        if(!p.connected){
+            warn.textContent=p.error||'برای این حساب هنوز رباتی متصل نشده است.';warn.classList.remove('d-none');
+            document.getElementById('bpName').textContent='—';document.getElementById('bpUser').textContent='';document.getElementById('bpId').textContent='';
+            botProfileOrig={};return;
+        }
+        warn.classList.add('d-none');
+        botProfileOrig={name:p.name||'',short_description:p.short_description||'',description:p.description||''};
+        document.getElementById('bpName').textContent=p.name||'';
+        document.getElementById('bpUser').textContent='@'+p.username;
+        document.getElementById('bpId').textContent='ID: '+p.id;
+        document.getElementById('bName').value=botProfileOrig.name;
+        document.getElementById('bShort').value=botProfileOrig.short_description;
+        document.getElementById('bDesc').value=botProfileOrig.description;
+        const img=document.getElementById('bpPhoto'),fb=document.getElementById('bpPhotoFallback');
+        img.classList.add('d-none');fb.classList.remove('d-none');
+        img.onload=()=>{img.classList.remove('d-none');fb.classList.add('d-none')};
+        img.onerror=()=>{img.classList.add('d-none');fb.classList.remove('d-none')};
+        img.src=`/api/user-photo?id=${p.id}&auth=${encodeURIComponent(PASS)}&t=${Date.now()}`;
+    }
+    // any picture → centered square JPEG (Telegram wants a static JPG) before upload
+    function toSquareJpeg(file,size=640){
+        return new Promise((resolve,reject)=>{
+            const img=new Image(),url=URL.createObjectURL(file);
+            img.onload=()=>{
+                const s=Math.min(img.width,img.height),cv=document.createElement('canvas');cv.width=cv.height=size;
+                cv.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,size,size);
+                URL.revokeObjectURL(url);cv.toBlob(b=>b?resolve(b):reject(new Error('convert')),'image/jpeg',0.9);
+            };
+            img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('load'))};
+            img.src=url;
+        });
+    }
+    async function uploadBotPhoto(input){
+        const f=input.files[0];input.value='';
+        if(!f)return;
+        let blob;
+        try{blob=await toSquareJpeg(f)}catch(e){showToast('این فایل عکس قابل‌خواندن نیست','error');return}
+        const fd=new FormData();fd.append('file',blob,'photo.jpg');
+        const res=await fetch('/api/bot-profile/photo',{method:'POST',headers:{Authorization:PASS},body:fd});
+        const d=await res.json().catch(()=>({}));
+        showToast(res.ok?(d.message||'انجام شد'):(d.error||'خطا'),res.ok?'success':'error',res.ok?2000:7000);
+        if(res.ok)loadBotProfile();
+    }
+    async function removeBotPhoto(){
+        if(!confirm('عکس ربات حذف شود؟'))return;
+        if(await adminCall('DELETE','/api/bot-profile/photo'))loadBotProfile();
+    }
+
+    // ---------- owner: user management GUI ----------
+    function genPass(){
+        const a='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789',b=new Uint32Array(12);
+        crypto.getRandomValues(b);return Array.from(b,x=>a[x%a.length]).join('');
+    }
+    async function adminCall(method,path,body){
+        const res=await fetch(path,{method,headers:{'Content-Type':'application/json',Authorization:PASS},body:body?JSON.stringify(body):undefined});
+        const d=await res.json().catch(()=>({}));
+        showToast(res.ok?(d.message||'انجام شد'):(d.error||'خطا'),res.ok?'success':'error',res.ok?2000:7000);
+        return res.ok;
+    }
+    // ---- signed-in devices (GET/PATCH/DELETE /api/sessions) ----
+    const DEV_PLAT={web:{icon:'bi-globe',label:'نسخه وب'},pwa:{icon:'bi-install',label:'وب‌اپ نصب‌شده'},android:{icon:'bi-android2',label:'اپ اندروید'},windows:{icon:'bi-windows',label:'اپ ویندوز'}};
+    // "5 minutes ago" in Persian. last_seen is stamped about every 5 minutes, so anything fresher than 10 is just "recently active".
+    function agoLabel(ts){
+        if(!ts)return 'نامشخص';
+        const s=(Date.now()-ts)/1000;
+        if(s<600)return 'اخیراً فعال';
+        const rtf=new Intl.RelativeTimeFormat('fa',{numeric:'auto'});
+        if(s<3600)return rtf.format(-Math.round(s/60),'minute');
+        if(s<86400)return rtf.format(-Math.round(s/3600),'hour');
+        return rtf.format(-Math.round(s/86400),'day');
+    }
+    async function loadDevices(){
+        const host=document.getElementById('devList');
+        const r=await apiFetch('/api/sessions');
+        if(!Array.isArray(r)){host.innerHTML='<div class="pm-empty">بارگذاری نشد</div>';return}
+        host.replaceChildren(...r.map(deviceCard));
+    }
+    function deviceCard(s){
+        const dv=s.device||{},pl=DEV_PLAT[dv.platform]||{icon:'bi-devices',label:'دستگاه ناشناس'};
+        const card=document.createElement('div');card.className='dev-card'+(s.current?' current':'');
+        const ic=document.createElement('i');ic.className='bi '+pl.icon+' dev-ic';
+        const info=document.createElement('div');info.className='dev-info';
+        const nm=document.createElement('div');nm.className='dev-name';
+        const nmText=document.createElement('span');nmText.textContent=dv.name||pl.label;nm.appendChild(nmText);
+        if(s.current){const b=document.createElement('span');b.className='dev-chip';b.textContent='این دستگاه';nm.appendChild(b)}
+        const sub=document.createElement('div');sub.className='dev-sub';
+        const when=s.created?new Date(s.created).toLocaleString('fa-IR',{dateStyle:'medium',timeStyle:'short'}):'';
+        sub.textContent=[pl.label+(dv.app?' '+dv.app:''),'آخرین فعالیت: '+(s.current?'هم‌اکنون':agoLabel(s.last_seen||s.created)),when&&'ورود: '+when].filter(Boolean).join(' · ');
+        info.append(nm,sub);
+        const acts=document.createElement('div');acts.className='dev-acts';
+        const ren=document.createElement('button');ren.className='icon-btn';ren.title='تغییر نام';ren.innerHTML='<i class="bi bi-pencil"></i>';
+        ren.onclick=()=>renameDevice(s,dv.name||'');
+        const out=document.createElement('button');out.className='icon-btn dev-kick';out.title=s.current?'خروج از این دستگاه':'خارج کردن این دستگاه';out.innerHTML='<i class="bi bi-box-arrow-right"></i>';
+        out.onclick=()=>kickDevice(s,dv.name||pl.label);
+        acts.append(ren,out);
+        card.append(ic,info,acts);
+        return card;
+    }
+    function renameDevice(s,cur){
+        openGmodModal('تغییر نام دستگاه','<input id="devName" class="form-control" maxlength="60" placeholder="مثلاً لپ‌تاپ کار">',async()=>{
+            const name=document.getElementById('devName').value.trim();
+            if(!name){showToast('نام را وارد کن','warn');return}
+            const r=await apiFetch('/api/sessions/'+encodeURIComponent(s.id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+            if(r&&r.success){closeGmod();showToast('نام تغییر کرد','success');loadDevices()}else showToast((r&&r.error)||'تغییر نام انجام نشد','error');
+        });
+        const inp=document.getElementById('devName');inp.value=cur;setTimeout(()=>{inp.focus();inp.select()},350);
+        inp.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('gmodModalOk').click()});
+    }
+    function kickDevice(s,label){
+        const me=!!s.current;
+        openGmodModal(me?'خروج از این دستگاه':'خارج کردن دستگاه','<p class="mb-0" id="devKickMsg"></p>',async()=>{
+            if(me){closeGmod();logout();return}
+            const r=await apiFetch('/api/sessions/'+encodeURIComponent(s.id),{method:'DELETE'});
+            if(r&&r.success){closeGmod();showToast('دستگاه خارج شد','success');loadDevices()}else showToast('انجام نشد','error');
+        });
+        document.getElementById('devKickMsg').textContent=me?'از این دستگاه خارج می‌شوی و برای ورود دوباره باید رمز را وارد کنی.':'«'+label+'» از حساب خارج می‌شود و برای ورود دوباره باید رمز را وارد کند.';
+    }
+    async function loadUsers(){
+        const host=document.getElementById('uList');
+        const r=await apiFetch('/api/admin/users');
+        host.innerHTML='';
+        if(!r||r.error){host.innerHTML='<div class="pm-empty">بارگذاری نشد</div>';return}
+        document.getElementById('uBaseWarn').classList.toggle('d-none',!!r.public_base_url_set);
+        if(!r.users.length){host.innerHTML='<div class="pm-empty">هنوز کاربری ساخته نشده</div>';return}
+        r.users.forEach(u=>host.appendChild(userCard(u)));
+    }
+    function userCard(u){
+        const card=document.createElement('div');card.className='u-card';
+        const head=document.createElement('div');head.className='u-head';
+        const name=document.createElement('span');name.className='u-name';name.textContent=u.username;
+        const badge=document.createElement('span');badge.className='u-badge '+(u.suspended?'off':'on');badge.textContent=u.suspended?'تعلیق‌شده':'فعال';
+        head.append(name,badge);
+        const meta=document.createElement('div');meta.className='u-meta';
+        const bot=document.createElement('div');
+        bot.textContent=u.has_bot?'🤖 @'+u.bot_username:'⚪️ ربات وصل نشده';
+        const mail=document.createElement('div');mail.textContent=u.telegram_id?'🆔 '+u.telegram_id+(u.recovery_ready?'':' (ربات وصل نیست؛ بازیابی رمز کار نمی‌کند)'):'⚠️ آیدی تلگرام ثبت نشده (بازیابی رمز کار نمی‌کند)';
+        meta.append(bot,mail);
+        const acts=document.createElement('div');acts.className='u-actions';
+        const mk=(icon,label,fn,cls)=>{const b=document.createElement('button');b.className='u-btn'+(cls?' '+cls:'');b.innerHTML=`<i class="bi ${icon}"></i> ${label}`;b.onclick=fn;return b};
+        acts.append(
+            mk('bi-robot',u.has_bot?'تغییر ربات':'اتصال ربات',()=>userDialog('bot',u),u.has_bot?'':'primary'),
+            mk('bi-key','رمز جدید',()=>userDialog('password',u)),
+            mk('bi-telegram','آیدی تلگرام',()=>userDialog('telegram',u)),
+            mk(u.suspended?'bi-play-circle':'bi-pause-circle',u.suspended?'رفع تعلیق':'تعلیق',async()=>{
+                if(await adminCall('POST',`/api/admin/users/${encodeURIComponent(u.username)}/suspend`,{suspended:!u.suspended}))loadUsers();
+            },u.suspended?'':'warn'),
+            mk('bi-trash3','حذف',()=>userDialog('delete',u),'danger')
+        );
+        card.append(head,meta,acts);return card;
+    }
+    // Bootstrap silently ignores hide() while the modal is still mid fade-in
+    // (first ~300ms); if a save finishes in that window the dialog would stay
+    // open forever, so check again once the transition is over.
+    function closeGmod(){
+        const el=document.getElementById('gmodModal'),inst=bootstrap.Modal.getInstance(el);
+        if(!inst)return;
+        inst.hide();
+        setTimeout(()=>{if(el.classList.contains('show'))inst.hide()},450);
+    }
+    function userDialog(kind,u){
+        const base=`/api/admin/users/${encodeURIComponent(u.username)}`;
+        const done=async(ok)=>{if(ok){closeGmod();loadUsers()}};
+        const val=id=>document.getElementById(id).value.trim();
+        if(kind==='password')openGmodModal('رمز جدید برای «'+u.username+'»',
+            `<div class="d-flex gap-2"><input id="dlgPass" class="form-control" placeholder="رمز جدید" autocomplete="new-password"><button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('dlgPass').value=genPass()"><i class="bi bi-magic"></i></button></div><div class="text-secondary mt-2" style="font-size:.78rem">رمز بعد از ذخیره قابل مشاهده نیست؛ همین‌جا کپی‌اش کن و به کاربر بده. کاربر از همه‌ی دستگاه‌ها خارج می‌شود.</div>`,
+            async()=>done(await adminCall('POST',base+'/password',{password:document.getElementById('dlgPass').value})));
+        else if(kind==='telegram')openGmodModal('آیدی تلگرام «'+u.username+'»',
+            `<input id="dlgTg" class="form-control" placeholder="مثلاً 123456789" inputmode="numeric" autocomplete="off" value="${u.telegram_id||''}"><div class="text-secondary mt-2" style="font-size:.78rem">آیدی عددی خودِ صاحب حساب (از @userinfobot). رمز موقت بازیابی به همین آیدی، از طریق ربات خودش، فرستاده می‌شود.</div>`,
+            async()=>done(await adminCall('POST',base+'/telegram-id',{telegramId:val('dlgTg')})));
+        else if(kind==='bot')openGmodModal('ربات «'+u.username+'»',
+            `<input id="dlgToken" class="form-control" placeholder="توکن BotFather" autocomplete="off"><div class="text-secondary mt-2" style="font-size:.78rem">توکن فقط برای ثبت webhook استفاده می‌شود و در تاریخچه‌ی چت‌ها نمی‌ماند.</div>`,
+            async()=>done(await adminCall('POST',base+'/bot',{token:val('dlgToken')})));
+        else if(kind==='delete')openGmodModal('حذف «'+u.username+'»',
+            `<div class="alert alert-danger py-2" style="font-size:.82rem">حساب، ربات متصل (webhook) و <b>تمام چت‌ها و تنظیمات</b> این کاربر برای همیشه پاک می‌شود. برای فقط قطع دسترسی از «تعلیق» استفاده کن.</div><input id="dlgConfirm" class="form-control" placeholder="برای تأیید، یوزرنیم را تایپ کن" autocomplete="off">`,
+            async()=>{
+                if(val('dlgConfirm')!==u.username){showToast('یوزرنیم تأیید درست نیست','warn');return}
+                done(await adminCall('DELETE',base));
+            });
+    }
+    async function createUser(){
+        const body={username:document.getElementById('uName').value.trim(),password:document.getElementById('uPass').value,telegramId:document.getElementById('uTgId').value.trim()};
+        if(await adminCall('POST','/api/admin/users',body)){
+            ['uName','uPass','uTgId'].forEach(id=>document.getElementById(id).value='');
+            loadUsers();
+        }
+    }
+    async function logout(){
+        try{await fetch('/api/logout',{method:'POST',headers:{Authorization:PASS}})}catch(e){}
+        localStorage.removeItem('TG_PASS');localStorage.removeItem('TG_IS_OWNER');PASS='';location.reload();
+    }
+    async function requestReset(){
+        const username=document.getElementById('forgotUser').value.trim();
+        if(!username){showToast('یوزرنیم را وارد کن','warn');return}
+        const res=await fetch('/api/request-password-reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
+        const d=await res.json().catch(()=>({}));
+        showToast(d.message||'درخواست ثبت شد','success',4000);
+        showAuthMode('login');
+    }
+    async function saveAllSettings(){
+        const v=id=>document.getElementById(id).value;
+        const body={
+            ai_mode:document.getElementById('gAiToggle').checked,system_prompt:v('gPrompt'),
+            poll_interval:parseInt(v('gPoll'))||3000,gemini_model:v('gModel').trim()||'gemini-2.5-flash',
+            batch_delay_seconds:parseFloat(v('gDelay'))||28,owner_user_id:v('gOwnerId').trim(),
+            sticker_packs:v('gStickerPacks').trim(),admin_group_id:v('gAdminGroup').trim(),
+        };
+        const key=v('gGeminiKey').trim();if(key)body.gemini_api_key=key;   // blank = keep the stored one
+        const res=await apiFetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!(res&&res.success)){showToast(res?.error||'خطا در ذخیره','error',5000);return}
+        pollMs=body.poll_interval;startPoller();
+        if(key)document.getElementById('gGeminiKey').value='';
+        // bot profile: only send what actually changed (Telegram rate-limits name changes)
+        const now={name:v('bName'),short_description:v('bShort'),description:v('bDesc')};
+        const changed={};Object.keys(now).forEach(k=>{if(botProfileOrig[k]!==undefined&&now[k]!==botProfileOrig[k])changed[k]=now[k]});
+        if(Object.keys(changed).length){
+            const r2=await apiFetch('/api/bot-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(changed)});
+            if(r2&&r2.error){showToast(r2.error,'error',5000);return}
+            botProfileOrig={...botProfileOrig,...changed};
+        }
+        showToast('تنظیمات ذخیره شد','success');goBackOneLevel();
+    }
+
+    let pollSkip=0;function startPoller(){fetchChats();if(curChatId)fetchHistory(curChatId,true);if(pollerID)clearInterval(pollerID);pollerID=setInterval(()=>{if(window.wsLive&&(++pollSkip%10))return;fetchChats(true);if(curChatId)fetchHistory(curChatId,true)},pollMs);if(window.wsConnect)wsConnect()}
+
+    // fetchChats/renderChatList/filterChats/togglePin/toggleMute/
+    // togglePinCurrent/toggleMuteCurrent now live in static/js/chatlist.js
+
+    // selChat/backList/murl/mkMedia/doReact/mkReactBar/mkReactionChips/
+    // setReply/cancelReply/fetchHistory now live in static/js/chat.js
+    // (Phase 2 — chat topbar + real-tail bubbles).
+
+    // sendMsg/pickFile/onFilePick/uploadMedia/toggleRec/cancelRec/
+    // stopRec now live in static/js/composer.js (Phase 3 — real tweb
+    // recording pill: cancel + dot/timer + an always-visible send button).
+
+    // new chat
+    function openNewChatModal(){pushUiState({level:'overlay',chatId:curChatId||null});new bootstrap.Modal(document.getElementById('newChatModal')).show()}
+    async function startNewChat(){const id=document.getElementById('ncId').value.trim();const msg=document.getElementById('ncMsg').value.trim();if(!id||!msg){showToast('شناسه و پیام لازم است','warn');return}const res=await apiFetch('/api/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:id,text:msg,customTitle:'مخاطب '+id,senderMode:'bot'})});if(res?.success){bootstrap.Modal.getInstance(document.getElementById('newChatModal')).hide();document.getElementById('ncId').value='';document.getElementById('ncMsg').value='';lastChatsHash='';await fetchChats(false);selChat(res.resolvedChatId||id,'مخاطب '+id,null)}else showToast(res?.error||'ارسال ناموفق','error')}
+
+    // profile
+    async function showProfileModal(){
+        if(!curChatId)return;
+        pushUiState({level:'profile',chatId:curChatId});
+        const modal=new bootstrap.Modal(document.getElementById('profileModal'));
+        const body=document.getElementById('profileBody');
+        body.innerHTML='<div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>';
+        modal.show();
+        // reflect current pin/mute state on the action buttons moved here from the topbar
+        const c=allChats.find(x=>x.id===curChatId);
+        const pinBtn=document.getElementById('paPin'),muteBtn=document.getElementById('paMute');
+        pinBtn.querySelector('i').className='bi '+(c&&c.pinned?'bi-pin-angle-fill':'bi-pin-angle');
+        pinBtn.querySelector('span').textContent=c&&c.pinned?'لغو پین':'پین گفتگو';
+        muteBtn.querySelector('i').className='bi '+(c&&c.muted?'bi-bell-slash-fill':'bi-bell');
+        muteBtn.querySelector('span').textContent=c&&c.muted?'لغو بی‌صدا':'بی‌صدا کردن';
+        // small status line under the "پنل AI" button — فعال (green) / غیرفعال (red)
+        apiFetch('/api/chat-settings?id='+encodeURIComponent(curChatId)).then(cfg=>{
+            const on=cfg?(cfg.ai_mode!==undefined?cfg.ai_mode:true):true;
+            const paEl=document.getElementById('paAiStatus');
+            paEl.textContent=on?'فعال':'غیرفعال';paEl.className='pa-sub '+(on?'on':'off');
+        });
+        if(isGroup) await renderGroupInfoBody(body);
+        else await renderUserProfileBody(body);
+    }
+
+    async function renderUserProfileBody(body){
+        const p=await apiFetch('/api/user-profile?id='+encodeURIComponent(curChatId));
+        body.innerHTML='';
+        if(!p||p.error){
+            const a=document.createElement('div');a.className='alert alert-warning';a.textContent='پروفایل در دسترس نیست';body.appendChild(a);
+            return;
+        }
+        const img=document.createElement('div');img.className='text-center mb-3';
+        const im=document.createElement('img');
+        im.src=`/api/user-photo?id=${encodeURIComponent(curChatId)}&auth=${encodeURIComponent(PASS)}`;
+        im.className='rounded-circle';
+        im.style.cssText='width:128px;height:128px;object-fit:cover;border:3px solid var(--md-sys-color-primary)';
+        im.onerror=()=>im.style.display='none';
+        img.appendChild(im);body.appendChild(img);
+        const rows=[['شناسه',p.id||curChatId,true],['نام',(p.first_name||'')+' '+(p.last_name||'')],['یوزرنیم',p.username?'@'+p.username:'ندارد'],['بیوگرافی',p.bio||'ثبت نشده']];
+        rows.forEach(([l,v,code])=>{const d=document.createElement('p');d.innerHTML=`<strong>${l}: </strong>`+(code?`<code>${v}</code>`:v);body.appendChild(d)});
+        if(p.limited){const note=document.createElement('div');note.className='alert alert-warning py-2';note.style.fontSize='.78rem';note.textContent=p.limited_reason;body.appendChild(note);}
+
+        // ---- shared media tabs (Photos/Videos/Files/Voice) ----
+        const tabs=document.createElement('div');tabs.className='pm-tabs';
+        const grid=document.createElement('div');grid.className='pm-media-grid';
+        const TAB_DEFS=[['photo','عکس',''],['video','ویدیو',''],['voice','صوتی','list'],['document','فایل','list']];
+        let media=null;
+        TAB_DEFS.forEach(([type,label,mode],i)=>{
+            const t=document.createElement('div');t.className='pm-tab'+(i===0?' active':'');t.textContent=label;
+            t.onclick=()=>{tabs.querySelectorAll('.pm-tab').forEach(x=>x.classList.remove('active'));t.classList.add('active');renderMediaGrid(grid,media,type,mode);};
+            tabs.appendChild(t);
+        });
+        body.appendChild(tabs);body.appendChild(grid);
+        grid.innerHTML='<div class="pm-empty">در حال بارگذاری...</div>';
+        media=await apiFetch('/api/chat-media?id='+encodeURIComponent(curChatId));
+        renderMediaGrid(grid,media,'photo','');
+    }
+
+    function renderMediaGrid(grid,media,type,mode){
+        grid.className='pm-media-grid'+(mode==='list'?' list':'');
+        grid.innerHTML='';
+        const items=(media&&media[type])||[];
+        if(!items.length){grid.innerHTML='<div class="pm-empty">چیزی نیست</div>';return;}
+        items.forEach(it=>{
+            if(mode==='list'){
+                const row=document.createElement('div');row.className='pm-media-row';
+                row.innerHTML=`<i class="bi ${type==='voice'?'bi-mic-fill':'bi-file-earmark'}"></i><span class="flex-1" style="flex:1">${type==='voice'?'پیام صوتی':'فایل'}</span><span class="text-secondary" style="font-size:.75rem">${it.time||''}</span>`;
+                row.onclick=()=>downloadFile(it.file_id,type);
+                grid.appendChild(row);
+            }else{
+                const tile=document.createElement('div');tile.className='pm-media-tile';
+                if(type==='photo'){const img=document.createElement('img');img.src=murl(it.file_id);tile.appendChild(img);tile.onclick=()=>viewMedia(it.file_id,'photo');}
+                else{const v=document.createElement('video');v.src=murl(it.file_id);v.muted=true;tile.appendChild(v);tile.onclick=()=>viewMedia(it.file_id,'video');}
+                grid.appendChild(tile);
+            }
+        });
+    }
+
+    // ---- group info (real tweb-style: header + members + management,
+    // all in one panel instead of a scattered topbar toolbar) ----
+    async function renderGroupInfoBody(body){
+        body.innerHTML='<div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>';
+        const info=await apiFetch('/api/group/info?chatId='+encodeURIComponent(curChatId));
+        body.innerHTML='';
+        const head=document.createElement('div');head.className='gi-header';
+        const im=document.createElement('img');
+        im.src=`/api/user-photo?id=${encodeURIComponent(curChatId)}&auth=${encodeURIComponent(PASS)}`;
+        im.className='rounded-circle';im.style.cssText='width:96px;height:96px;object-fit:cover;border:3px solid var(--md-sys-color-primary)';
+        im.onerror=()=>im.style.display='none';
+        head.appendChild(im);
+        const h=document.createElement('h5');h.className='mt-2 mb-0';h.textContent=(info&&info.title)||curChatId;head.appendChild(h);
+        if(info&&info.member_count!=null){const mc=document.createElement('div');mc.className='gi-meta';mc.textContent=info.member_count+' عضو';head.appendChild(mc);}
+        if(info&&info.description){const d=document.createElement('div');d.className='gi-desc';d.textContent=info.description;head.appendChild(d);}
+        body.appendChild(head);
+
+        const memTitle=document.createElement('div');memTitle.className='gi-section-title';
+        memTitle.textContent='اعضا (فقط ادمین‌ها — Bot API دسترسی به لیست کامل اعضا نداره)';
+        body.appendChild(memTitle);
+        const memList=document.createElement('div');memList.id='giMembers';
+        memList.innerHTML='<div class="pm-empty">در حال بارگذاری...</div>';
+        body.appendChild(memList);
+        apiFetch('/api/group/members?chatId='+encodeURIComponent(curChatId)).then(res=>{
+            memList.innerHTML='';
+            const admins=(res&&res.admins)||[];
+            if(!admins.length){memList.innerHTML='<div class="pm-empty">موردی نیست</div>';return;}
+            admins.forEach(a=>{
+                const u=a.user||{};
+                const row=document.createElement('div');row.className='gi-member';
+                const av=document.createElement('div');av.className='gi-member-av';av.style.background=avGrad(u.id||u.username||'?');
+                av.textContent=(u.first_name||'?')[0].toUpperCase();
+                const nm=document.createElement('div');nm.className='gi-member-name';nm.textContent=(u.first_name||'')+' '+(u.last_name||'')+(u.username?' (@'+u.username+')':'');
+                const badge=document.createElement('span');badge.className='gi-role-badge'+(a.status==='creator'?' owner':'');
+                badge.textContent=a.status==='creator'?'سازنده':'ادمین';
+                row.append(av,nm,badge);
+                memList.appendChild(row);
+            });
+        });
+
+        const mgmtTitle=document.createElement('div');mgmtTitle.className='gi-section-title';mgmtTitle.textContent='مدیریت گروه';
+        body.appendChild(mgmtTitle);
+        const mgmt=document.createElement('div');mgmt.className='gi-mgmt-grid';
+        const actions=[
+            ['bi-mic-mute','سکوت کاربر',showMuteModal,'danger'],
+            ['bi-ban','بن کاربر',showBanModal,'danger'],
+            ['bi-check-circle','آنبن کاربر',showUnbanModal,''],
+            ['bi-trash3','حذف N پیام',showDeleteMsgsModal,'warn'],
+            ['bi-person-x','حذف پیام‌های یک کاربر',deleteUserMsgs,'warn'],
+            ['bi-funnel','فیلتر محتوا',showFilterModal,''],
+        ];
+        actions.forEach(([icon,label,fn,cls])=>{
+            const b=document.createElement('button');b.className='pa-btn'+(cls==='danger'?' danger':'');
+            if(cls==='warn')b.style.color='var(--app-amber)';
+            b.innerHTML=`<i class="bi ${icon}"></i><span>${label}</span>`;
+            b.onclick=fn;
+            mgmt.appendChild(b);
+        });
+        body.appendChild(mgmt);
+    }
+
+    // edit
+    async function editMsg(iid,mid,old){const nt=prompt('ویرایش پیام:',old);if(!nt||nt===old)return;const res=await apiFetch('/api/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,msgId:mid,internalId:iid,newText:nt})});if(res?.success)fetchHistory(curChatId,false)}
+
+    // delete chat
+    async function deleteCurrentChat(){if(!curChatId)return;if(!confirm('این گفتگو از پنل حذف شود؟'))return;await apiFetch('/api/delete-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId})});backList();lastChatsHash='';fetchChats(false)}
+
+    // chat AI settings
+    async function loadChatSP(id){
+        const cfg=await apiFetch('/api/chat-settings?id='+encodeURIComponent(id));
+        const on=cfg?(cfg.ai_mode!==undefined?cfg.ai_mode:true):true;
+        document.getElementById('csAi').checked=on;
+        document.getElementById('csPrompt').value=cfg?.system_prompt||'';
+        updateCsStatus();
+    }
+    function updateCsStatus(){
+        const on=document.getElementById('csAi').checked;
+        const el=document.getElementById('csStatus');
+        el.textContent=on?'فعال':'غیرفعال';el.className='pa-sub '+(on?'on':'off');
+        const paEl=document.getElementById('paAiStatus');
+        if(paEl){paEl.textContent=on?'فعال':'غیرفعال';paEl.className='pa-sub '+(on?'on':'off')}
+    }
+    async function saveChatSettings(){if(!curChatId)return;const res=await apiFetch('/api/chat-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,ai_mode:document.getElementById('csAi').checked,system_prompt:document.getElementById('csPrompt').value})});if(res?.success){bootstrap.Modal.getInstance(document.getElementById('chatSP')).hide()}else showToast(res?.error||'خطا','error')}
+    // Opened from the profile modal's "پنل AI" button; closing this modal
+    // (any way — X, backdrop, Escape, or its own back-arrow, which just
+    // calls .hide()) re-opens the profile modal, so "back" always lands
+    // you where you came from. (History is the single source of truth now —
+    // see pushUiState/applyUiState/wireModalBackStack in chat.js — so this
+    // just pushes the next level; popstate on the way back is what actually
+    // re-opens the profile modal, whether "back" came from this screen's
+    // own control, the device back button, or a laptop's mouse back button.)
+    function openChatSettingsFromProfile(){
+        pushUiState({level:'ai',chatId:curChatId});
+        bootstrap.Modal.getInstance(document.getElementById('profileModal'))?.hide();
+        new bootstrap.Modal(document.getElementById('chatSP')).show();
+    }
+
+    // ---- group moderation ----
+    function openGmodModal(title,body,onOk){pushUiState({level:'overlay',chatId:curChatId||null});document.getElementById('gmodModalTitle').textContent=title;document.getElementById('gmodModalBody').innerHTML=body;const ok=document.getElementById('gmodModalOk');const clone=ok.cloneNode(true);ok.parentNode.replaceChild(clone,ok);clone.onclick=onOk;const modal=new bootstrap.Modal(document.getElementById('gmodModal'));modal.show()}
+    function showMuteModal(){openGmodModal('سکوت کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUid" class="form-control mb-3" placeholder="12345678"><label class="mb-2 d-block">مدت (ثانیه، 0=دائمی)</label><input id="gmDur" type="number" value="0" class="form-control">`,async()=>{const uid=document.getElementById('gmUid').value.trim();const dur=parseInt(document.getElementById('gmDur').value)||0;const until=dur>0?Math.floor(Date.now()/1000)+dur:0;const res=await apiFetch('/api/group/restrict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,userId:uid,mute:true,untilDate:until})});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'سکوت اعمال شد')})}
+    function showBanModal(){openGmodModal('بن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmBuid" class="form-control mb-3" placeholder="12345678"><div class="form-check"><input class="form-check-input" type="checkbox" id="gmRev"><label class="form-check-label">حذف پیام‌های اخیر</label></div>`,async()=>{const uid=document.getElementById('gmBuid').value.trim();const rev=document.getElementById('gmRev').checked;const res=await apiFetch('/api/group/ban',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,userId:uid,revokeMessages:rev})});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'بن انجام شد')})}
+    function showUnbanModal(){openGmodModal('آنبن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUbuid" class="form-control" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmUbuid').value.trim();const res=await apiFetch('/api/group/unban',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,userId:uid})});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'آنبن انجام شد')})}
+    function showDeleteMsgsModal(){openGmodModal('حذف پیام‌های آخر',`<label class="mb-2 d-block">تعداد پیام برای حذف (حداکثر 200)</label><input id="gmDc" type="number" value="10" min="1" max="200" class="form-control">`,async()=>{const n=parseInt(document.getElementById('gmDc').value)||10;const res=await apiFetch('/api/group/delete-messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,count:n})});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();if(res?.success){showToast(`${res.deleted} پیام حذف شد`,'success');fetchHistory(curChatId,false)}else showToast(res?.error||'خطا','error')})}
+    async function deleteUserMsgs(){const uid=prompt('آیدی عددی کاربر را وارد کن:');if(!uid)return;const res=await apiFetch('/api/group/delete-user-messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,userId:uid})});toastResult(res,'پیام‌های کاربر حذف شد')}
+    function showFilterModal(){openGmodModal('فیلتر محتوا در گروه',`<div class="d-flex flex-wrap gap-2"><div class="form-check"><input class="form-check-input" type="checkbox" id="fSticker"><label class="form-check-label">استیکر</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fGif"><label class="form-check-label">GIF</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fVoice"><label class="form-check-label">ویس</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fVideo"><label class="form-check-label">ویدیو</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fPhoto"><label class="form-check-label">عکس</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fFile"><label class="form-check-label">فایل</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fLink"><label class="form-check-label">لینک</label></div><div class="form-check"><input class="form-check-input" type="checkbox" id="fSong"><label class="form-check-label">آهنگ</label></div></div>`,async()=>{const filters={sticker:document.getElementById('fSticker').checked,gif:document.getElementById('fGif').checked,voice:document.getElementById('fVoice').checked,video:document.getElementById('fVideo').checked,photo:document.getElementById('fPhoto').checked,file:document.getElementById('fFile').checked,link:document.getElementById('fLink').checked,song:document.getElementById('fSong').checked};const res=await apiFetch('/api/group/content-filter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatId:curChatId,filters})});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'فیلترها ذخیره شدند')})}
+    // loadGroupAdmins removed (Phase 5) — members now render directly
+    // inside renderGroupInfoBody() instead of a separate admins-only modal.
+    // a stored session is re-validated right away (not on window.onload, which waits for every image/font)
+    if(PASS)login();
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

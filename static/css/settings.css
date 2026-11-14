@@ -1,0 +1,88 @@
+/* ==========================================================================
+   Sign-in card, settings pages (list → sub-page), user cards, bot profile.
+   Moved here from the old inline <style> and rebuilt on M3.
+   ========================================================================== */
+
+/* ---------- start-up splash (no sign-in flash on reload) ---------- */
+/* <head> adds html.has-session when a token is stored, before the first paint: the sign-in card never shows,
+   and this splash stands in until the session is confirmed. Its status line only fades in if loading is slow. */
+html.has-session #authBox{display:none!important}
+.splash{position:fixed;inset:0;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:28px;background:var(--md-sys-color-surface)}
+html.has-session .splash{display:flex}
+.splash .brand-orb{animation:md-pop-in var(--md-dur-m3) var(--md-ease-emph-decel) both}
+.splash-status{display:flex;align-items:center;gap:10px;color:var(--md-sys-color-on-surface-variant);font:var(--md-type-label-large);animation:md-fade-in var(--md-dur-m2) var(--md-ease-standard) .9s both}
+.splash-status .spinner-border{color:var(--md-sys-color-primary)}
+.splash.leaving{opacity:0;pointer-events:none;transition:opacity var(--md-dur-m1) var(--md-ease-standard)}
+
+/* ---------- sign-in ---------- */
+#authBox{background:var(--md-sys-color-surface)}
+.auth-card{width:min(360px,calc(100vw - 32px));padding:32px 24px 24px;border-radius:var(--md-sys-shape-xl);background:var(--md-sys-color-surface-container);
+    box-shadow:var(--md-elev-1);animation:md-slide-up var(--md-dur-m3) var(--md-ease-emph-decel)}
+.auth-card h5{font:var(--md-type-headline-small);margin:0 0 4px}
+.auth-card p{font:var(--md-type-body-medium);color:var(--md-sys-color-on-surface-variant)!important;margin-bottom:20px!important}
+.auth-card .form-control{text-align:center;margin-bottom:12px}
+.auth-card .btn{margin-top:8px}
+.auth-link{display:inline-flex;align-items:center;margin-top:12px;padding:6px 14px;border-radius:var(--md-sys-shape-full);font:var(--md-type-label-large);color:var(--md-sys-color-primary);cursor:pointer}
+.auth-suspended{background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container);border-radius:var(--md-sys-shape-md);padding:10px 14px;font:var(--md-type-body-medium);margin-bottom:16px;text-align:start}
+#authLogin:not(.d-none),#authForgot:not(.d-none),#authForce:not(.d-none){animation:md-fade-through var(--md-dur-m2) var(--md-ease-emph-decel)}
+
+/* ---------- settings shell ---------- */
+.settings-page{position:absolute;inset:0;z-index:40;display:none;flex-direction:column;background:var(--md-sys-color-surface)}
+.settings-page.show{display:flex;animation:md-fade-in var(--md-dur-s4) var(--md-ease-standard)}
+@keyframes md-fade-in{from{opacity:0}to{opacity:1}}
+.sp-view{display:flex;flex-direction:column;height:100%;animation:md-shared-axis-in var(--md-dur-m2) var(--md-ease-emph-decel)}
+.sp-hdr{display:flex;align-items:center;gap:8px;height:var(--app-header-height);padding:0 8px;flex-shrink:0;background:var(--md-sys-color-surface)}
+.sp-hdr h5{margin:0;font:var(--md-type-title-large)}
+.sp-body{flex:1;overflow-y:auto;padding:8px 16px 32px}
+.sp-body>*{max-width:640px;margin-inline:auto}
+.sp-body>.btn{display:flex}
+
+/* list rows (M3 list items with a tonal leading icon) */
+.sp-list-row{display:flex;align-items:center;gap:16px;min-height:64px;padding:8px 16px;border-radius:var(--md-sys-shape-lg);cursor:pointer;color:var(--md-sys-color-on-surface);margin-bottom:2px}
+.sp-list-row>.bi:first-child{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.375rem;
+    background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);flex-shrink:0}
+.sp-list-row span{flex:1;font:var(--md-type-body-large)}
+.sp-list-row small{color:var(--md-sys-color-on-surface-variant);font:var(--md-type-body-small)}
+.sp-list-row .bi.arrow{color:var(--md-sys-color-on-surface-variant);font-size:1.5rem}
+
+/* cards + rows */
+.sp-card{border-radius:var(--md-sys-shape-lg);padding:16px;display:flex;flex-direction:column;gap:16px;background:var(--md-sys-color-surface-container)}
+.sp-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px}
+.sp-row label{flex:1;font:var(--md-type-body-medium);color:var(--md-sys-color-on-surface)}
+.sp-row .sp-inp{max-width:100%}
+.sp-row>span{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sp-row>.sp-inp,.sp-row>span .sp-inp{flex-shrink:1;min-width:0}
+.u-form-title{display:flex;align-items:center;gap:8px;font:var(--md-type-label-large);color:var(--md-sys-color-primary);margin:8px 4px 12px}
+
+/* bot profile */
+.bp-head{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.bp-avatar{width:88px;height:88px;border-radius:50%;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;font-size:2.5rem}
+.bp-avatar img{width:100%;height:100%;object-fit:cover}
+.bp-name{font:var(--md-type-title-large)}
+.bp-meta{font:var(--md-type-body-small);color:var(--md-sys-color-on-surface-variant);text-align:start}
+
+/* panel users */
+.u-card{background:var(--md-sys-color-surface-container);border-radius:var(--md-sys-shape-lg);padding:16px;margin-bottom:12px}
+.u-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.u-name{font:var(--md-type-title-medium);direction:ltr}
+.u-badge{font:var(--md-type-label-small);padding:3px 10px;border-radius:var(--md-sys-shape-sm)}
+.u-badge.on{background:var(--app-green-container);color:var(--app-on-green-container)}
+.u-badge.off{background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)}
+.u-meta{font:var(--md-type-body-small);color:var(--md-sys-color-on-surface-variant);display:flex;flex-direction:column;gap:2px;margin-bottom:12px;word-break:break-all}
+.u-actions{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ---------- signed-in devices ---------- */
+.dev-card{display:flex;align-items:center;gap:14px;padding:12px 8px;padding-inline:16px 8px;margin-bottom:8px;border-radius:var(--md-sys-shape-lg);
+    background:var(--md-sys-color-surface-container)}
+.dev-card.current{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+.dev-ic{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;
+    background:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-primary)}
+.dev-card.current .dev-ic{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary)}
+.dev-info{flex:1;min-width:0}
+.dev-name{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font:var(--md-type-title-medium)}
+.dev-name>span:first-child{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dev-chip{font:var(--md-type-label-small);padding:2px 8px;border-radius:var(--md-sys-shape-sm);background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary)}
+.dev-sub{font:var(--md-type-body-small);color:var(--md-sys-color-on-surface-variant);margin-top:2px}
+.dev-card.current .dev-sub{color:inherit;opacity:.8}
+.dev-acts{display:flex;flex-shrink:0}
+.dev-kick{color:var(--md-sys-color-error)}
