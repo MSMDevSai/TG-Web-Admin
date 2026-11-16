@@ -41,4 +41,7 @@ export const DEFAULTS = {
   archive_media: true,
   archive_max_mb: 20,
   archive_video_note: false,
+  anon_enabled: true,                 // قابلیت پیام ناشناس (کلی)
+  anon_rate_per_hour: 30,             // سقف پیام ناشناس هر فرستنده در ساعت
+  anon_retention_days: 14,            // مسیریابی پاسخ‌ها و شماره‌ها پس از این مدت پاک می‌شود
 };

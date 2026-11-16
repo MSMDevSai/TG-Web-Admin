@@ -122,5 +122,8 @@ c0 = calls().length; await bm(mkMsg({ id: 40, text: '/send_msg کارت دارم
 ok(since(c0).some((x) => x.p.text && x.p.text.includes('کارت دارم') && x.p.chat_id === ADMIN), '/send_msg به ادمین‌ها رسید');
 await (await E('prefs'))({ notify: false }, ctxOf(2222));
 ok((await db.select().from(members).where(eq(members.tgId, 2222)).get()).notify === false, 'خاموش کردن اعلان شخصی ذخیره شد');
+// ── قابلیت‌های فاز دوم (دسته‌بندی، جستجو، سنجاق، فوروارد، مدیریت گروه، پیام ناشناس)
+const feat = await import('./features.mjs');
+fails += await feat.default({ H, E, ok, ctxOf, calls, since, expectErr, sleep, ADMIN, saveSettings, getChat, db, messages, eq });
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');
 process.exit(fails ? 1 : 0);

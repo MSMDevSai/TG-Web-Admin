@@ -5,6 +5,6 @@ set -e
 T=$(mktemp -d)
 cp -r tgcloud "$T/tgcloud"
 mkdir -p "$T/node_modules" && cp -r dev/mock-sdk "$T/node_modules/sdk"
-cp dev/run.mjs "$T/run.mjs"
+cp dev/*.mjs "$T/"
 echo '{"type":"module"}' > "$T/package.json"
 cd "$T" && node --experimental-sqlite --no-warnings run.mjs

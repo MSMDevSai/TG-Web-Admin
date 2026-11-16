@@ -1,5 +1,5 @@
 import { db, EndpointError } from 'sdk';
-import { and, eq, lt, desc, isNotNull } from 'sdk/db';
+import { and, eq, lt, gt, desc, asc, isNotNull } from 'sdk/db';
 import { messages, reads } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
 import { getChat } from '../lib/store.js';
@@ -18,9 +18,21 @@ export default async function (input, ctx) {
   if (input.filter === 'media') conds.push(isNotNull(messages.type));
   if (input.beforeId) conds.push(lt(messages.id, Number(input.beforeId)));
 
-  const rows = (await db.select().from(messages).where(and(...conds)).orderBy(desc(messages.id)).limit(limit).all()).reverse();
+  let rows, hasMoreOlder = false, hasMoreNewer = false;
+  if (input.aroundId) {
+    // پرش به یک پیام (از نتیجه‌ی جستجو): ۴۰ پیام قبل و ۴۰ پیام بعد
+    const aid = Number(input.aroundId);
+    const before = await db.select().from(messages).where(and(eq(messages.chatId, chatId), lt(messages.id, aid))).orderBy(desc(messages.id)).limit(40).all();
+    const after = await db.select().from(messages).where(and(eq(messages.chatId, chatId), gt(messages.id, aid - 1))).orderBy(asc(messages.id)).limit(41).all();
+    hasMoreOlder = before.length === 40; hasMoreNewer = after.length === 41;
+    rows = [...before.reverse(), ...after.slice(0, 40 + (hasMoreNewer ? 0 : 1))];
+  } else {
+    rows = (await db.select().from(messages).where(and(...conds)).orderBy(desc(messages.id)).limit(limit).all()).reverse();
+    hasMoreOlder = rows.length === limit;
+  }
+  const pinRow = await db.select().from(messages).where(and(eq(messages.chatId, chatId), isNotNull(messages.pinnedAt))).orderBy(desc(messages.pinnedAt), desc(messages.id)).limit(1).get();
 
-  if (!input.filter && !input.beforeId && rows.length) {
+  if (!input.filter && !input.beforeId && !input.aroundId && rows.length) {
     const lastId = rows[rows.length - 1].id;
     const key = `${me.id}:${chatId}`;
     await db.insert(reads).values({ key, tgId: me.id, chatId, lastId })
@@ -28,15 +40,17 @@ export default async function (input, ctx) {
   }
 
   return {
-    chat: { id: chat.id, title: chat.title, isGroup: chat.isGroup, business: !!chat.bizId, direct: chat.hasBotChat,
+    chat: { id: chat.id, title: chat.title, isGroup: chat.isGroup, kind: chat.kind, business: !!chat.bizId, direct: chat.hasBotChat,
       muted: chat.muted, pinned: chat.pinned, aiMode: chat.aiMode, prompt: me.role === 'admin' ? chat.prompt : undefined,
       aiPending: chat.aiPendingUntil > now() },
-    hasMore: rows.length === limit,
+    hasMore: hasMoreOlder, hasMoreNewer, around: !!input.aroundId,
+    pinned: pinRow ? { id: pinRow.id, msgId: pinRow.msgId, text: String(pinRow.text || '').slice(0, 120), sender: pinRow.sender, type: pinRow.type } : null,
     messages: rows.map((r) => ({
       id: r.id, msgId: r.msgId, role: r.role, sender: r.sender, text: r.text, type: r.type, mediaKey: r.mediaKey,
       replyTo: r.replyToMsgId, replyPreview: r.replyPreview, fwd: r.forwardedFrom,
       myReaction: r.myReaction, theirReaction: r.theirReaction, mode: r.senderMode,
-      ts: r.ts, editedAt: r.editedAt, deletedAt: r.deletedAt, deletedBy: r.deletedBy,
+      ts: r.ts, editedAt: r.editedAt, deletedAt: r.deletedAt, deletedBy: r.deletedBy, pinnedAt: r.pinnedAt,
+      senderId: me.role === 'admin' && r.role === 'user' ? r.senderId : undefined,
     })),
   };
 }

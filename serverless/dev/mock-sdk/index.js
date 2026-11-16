@@ -8,6 +8,8 @@ globalThis.__calls = []; globalThis.__apiFail = {}; globalThis.__gemini = { text
 export const api = new Proxy({}, { get: (_, method) => async (p = {}) => {
   globalThis.__calls.push({ method, p });
   if (globalThis.__apiFail[method]) throw new BotApiError(globalThis.__apiFail[method]);
+  if (method === 'getMe') return { id: 999, username: 'mock_bot' };
+  if (method === 'copyMessage') { if (globalThis.__apiFail.copyMessage) throw new BotApiError(globalThis.__apiFail.copyMessage); return { message_id: ++mid }; }
   if (method === 'getBusinessConnection') return { user: { id: 777 }, is_enabled: true };
   if (method === 'getFileContent') return new Uint8Array(Array.from({ length: 1000 }, (_, i) => i & 255));
   if (/^send/.test(method)) {

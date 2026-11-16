@@ -21,6 +21,12 @@ An AI assistant for your **Telegram Business** account plus a **Mini App panel**
 - **Media in the panel:** photos, video, GIFs, voice, audio, stickers (static / video), files — viewing and sending (attach button and voice recording).
 - **Panel:** chat list with search, unread counters, pin / mute, filters "All / Media / Deleted", reply, react, edit, delete (admin), edit history, per-chat AI mode and prompt, global settings, member management.
 - **Commands for contacts:** `/start`, `/send_msg <text>` (forwards a message to the admins).
+- **Chat categories:** shared tabs in the chat list (⭐ VIP, Colleagues, …) next to the built-in tabs All / Unread / Private / Groups. Admins create, rename, reorder and delete categories; every member can put a chat into one or more categories. Pinning a chat keeps it on top.
+- **Search:** chat-list filter, **full-text search across all messages** (including deleted ones, with highlights) and in-chat search. Tapping a result jumps to that message with its surrounding context.
+- **Pin a message** inside a chat (banner at the top of the chat; admins also pin it in Telegram) and **pin a chat** in the list.
+- **Forward** one or many messages to one or several chats (re-sent from the archive, so it also works for business chats), with an optional "↪ forwarded from …" label. **Multi-select** (long-press or menu) for forwarding and bulk delete.
+- **Group moderation (admins):** ban (optionally deleting the user's messages), kick, mute for 1 hour / 1 day / 7 days / forever, unmute, unban, delete all recent messages of a user, delete selected messages in bulk, and an action log with one-tap undo.
+- **Anonymous messages:** anyone can get a private link and receive anonymous messages — see the section below.
 
 ### Roles
 
@@ -31,8 +37,28 @@ An AI assistant for your **Telegram Business** account plus a **Mini App panel**
 | Delete a message from Telegram (it stays in the panel) | ✅ | ❌ |
 | AI settings, Gemini key, prompt, global settings | ✅ | ❌ |
 | Manage members | ✅ | ❌ |
+| Forward, multi-select, search, pin a message in the panel, put a chat into categories | ✅ | ✅ |
+| Pin a message in Telegram, group moderation, bulk delete, create / edit categories, anonymous-messages overview | ✅ | ❌ |
 
 IDs listed in `BOOTSTRAP_ADMINS` (`tgcloud/lib/config.js`) are always admins and cannot be removed or demoted from the panel, so you can never lock yourself out.
+
+### Anonymous messages
+
+Like the popular "anonymous message" bots:
+
+1. Anyone sends `/anon` to the bot in a private chat and receives a private link `https://t.me/<bot>?start=anon_<token>`.
+2. Anyone who opens the link can write to the link's owner. The owner receives it as **"📩 Anonymous #3"** — no name, no ID — with **Block** and **Report** buttons. Text, photos, video, voice, files, stickers and round videos are supported.
+3. The owner **replies** (Telegram's Reply) to a message and the answer reaches the sender anonymously. The conversation can continue both ways.
+4. The owner can turn the link off / on, create a new link (the old one stops working), see simple statistics (`/anon stats`), block a sender, or report a message. A sender leaves the mode with `/stop`.
+
+Privacy and safety by design:
+
+- The sender's ID is never sent to the link's owner; messages are relayed with `sendMessage` / `copyMessage` (no "forwarded from").
+- These messages **never enter the panel's chats or the `messages` table**. Only a small routing table (ids and timestamps, no text) is kept, and it is purged after `anon_retention_days` (default 14).
+- **Honest note to senders:** the bot tells them that if a message is reported, the bot's admins can see that message and the sender's ID. **Report** copies the message to the admins and offers a one-tap **global block**.
+- Abuse limits: per-sender rate limit (`anon_rate_per_hour`, default 30), per-owner and global blocks, a global on / off switch. A blocked sender and a disabled link get the same neutral reply.
+- Admins see simple statistics and manage global blocks in the panel (menu → 🕶 Anonymous messages). Message contents are not stored, so they cannot be shown there.
+- As the bot's operator you technically control the code and the database; the design only avoids storing message text.
 
 ### How it works
 
@@ -47,11 +73,13 @@ IDs listed in `BOOTSTRAP_ADMINS` (`tgcloud/lib/config.js`) are always admins and
 
 ```
 tgcloud/
-  schema.js        members, settings, connections, chats, messages, edits, media, upload_parts, reads
+  schema.js        members, settings, connections, chats, messages, edits, media, upload_parts, reads,
+                   categories, chat_categories, mod_log, anon_links / sessions / messages / aliases / blocks
   handlers/        Telegram update handlers
-  endpoints/       boot, chats, messages, send, upload, media, react, editMessage, editHistory,
-                   deleteMessage, chatPrefs, settings, members, prefs
-  lib/             config, store, auth, ingest, ai, media, notify, edits, tg, util, b64
+  endpoints/       boot, chats, messages, send, upload, media, react, editMessage, editHistory, deleteMessage,
+                   deleteMessages, forward, pinMessage, search, categories, groupMod, chatPrefs, settings,
+                   members, prefs, anonAdmin
+  lib/             config, store, auth, ingest, ai, anon, media, notify, edits, tg, util, b64
 web/               Mini App (index.html, app.js, style.css) — no build step
 dev/               local tests on a mock SDK + SQLite  (sh dev/test.sh)
 tgcloud.jsonc  package.json
@@ -89,8 +117,14 @@ tgcloud.jsonc  package.json
 4. **Business delete / edit / reaction** depend on the permissions granted in Telegram Business; errors appear in the panel as readable messages.
 5. **Voice from the Mini App.** Telegram's web view may record ogg, m4a or webm. The panel tries `voice → audio → document`; if webm is produced it will not become a real voice note and an ogg conversion has to be added.
 6. **JSON size limits and database size** are not specified in the documentation. If responses are rejected, lower `CHUNK` in `endpoints/media.js` and `web/app.js` / `endpoints/upload.js`; limit storage with `archive_max_mb` and `archive_media`.
+7. **Newer Bot API calls:** `copyMessage` (anonymous relay), `banChatMember`, `restrictChatMember`, `deleteMessages`, and `pinChatMessage` with `business_connection_id`. They depend on the bot's rights in each group / business connection; failures appear as readable messages.
+8. **Random tokens:** anonymous links use `crypto.getRandomValues`; if the runtime lacks it the code falls back to `Math.random` — check which one you get, since the link is a secret.
+9. **Message search** uses SQL `LIKE` over the `messages` table: fine for tens of thousands of messages; for a very large archive, check its speed on the platform.
 
-The bundled tests (`sh dev/test.sh`, Node 22.5+) check the project's own logic against a mock SDK and SQLite — they do not prove how the real platform behaves.
+The bundled tests check the project's own logic against a mock SDK and SQLite — they do not prove how the real platform behaves:
+
+- `sh dev/test.sh` (Node 22.5+) — 127 backend checks: archive, AI timer, roles, forward, pin, categories, search, group moderation, anonymous messaging (including "no trace of the sender reaches the owner").
+- `sh dev/ui-test.sh` — opens the Mini App in real Chromium (Playwright) against the same backend, clicks through the main flows, takes screenshots and fails on any JavaScript error or stray `null` / `false` text.
 
 ### Differences from the Hugging Face edition
 
@@ -105,7 +139,8 @@ The bundled tests (`sh dev/test.sh`, Node 22.5+) check the project's own logic a
 | AI context | Last N messages | Whole history |
 | Media | Bytes archived in the database, chunked transfer, no ffmpeg | Streamed from Telegram by `file_id`, Range, ffmpeg |
 | Deleted messages | Marked 🗑, content kept; edit history kept | History kept; deletions not marked |
-| Not yet ported | Group moderation, sticker / GIF panel, forward, in-chat pin, bot profile editing, profile photos, animated (tgs) stickers | — |
+| Anonymous messages, chat categories, full-text message search | ✅ | ❌ (chat-list filter only) |
+| Not yet ported | Sticker / GIF panel, bot profile editing, profile photos, animated (tgs) stickers | — |
 
 ---
 
@@ -130,6 +165,12 @@ The bundled tests (`sh dev/test.sh`, Node 22.5+) check the project's own logic a
 - **رسانه در پنل:** عکس، ویدیو، گیف، ویس، موزیک، استیکر (ثابت / ویدیویی)، فایل — هم نمایش و هم ارسال (دکمه‌ی پیوست و ضبط ویس).
 - **پنل:** لیست چت‌ها با جستجو، شمارنده‌ی نخوانده، پین / بی‌صدا، فیلتر «همه / رسانه / حذف‌شده»، پاسخ، ری‌اکشن، ویرایش، حذف (ادمین)، تاریخچه‌ی ویرایش، حالت و پرامپت AI برای هر چت، تنظیمات کلی، مدیریت اعضا.
 - **دستورهای مخاطب:** `/start` و `/send_msg <متن>` (ارسال پیام برای ادمین‌ها).
+- **دسته‌بندی چت‌ها:** تب‌های مشترک در لیست چت (⭐ مشتری ویژه، همکاران، …) کنار تب‌های آماده‌ی همه / نخوانده / خصوصی / گروه‌ها. ادمین‌ها دسته می‌سازند، نامش را عوض می‌کنند، ترتیب می‌دهند و حذف می‌کنند؛ همه‌ی اعضا می‌توانند چت را در یک یا چند دسته بگذارند. پین چت، آن را بالای لیست نگه می‌دارد.
+- **جستجو:** فیلتر لیست چت، **جستجوی متنی در همه‌ی پیام‌ها** (حتی پاک‌شده‌ها، با هایلایت) و جستجو داخل هر چت. با زدن روی نتیجه، به همان پیام و پیام‌های اطرافش می‌پرد.
+- **پین پیام** داخل چت (نوار بالای چت؛ ادمین‌ها در خود تلگرام هم پین می‌کنند) و **پین چت** در لیست.
+- **فوروارد** یک یا چند پیام به یک یا چند چت (از آرشیو دوباره ارسال می‌شود، پس برای چت‌های بیزینس هم کار می‌کند) با برچسب اختیاری «↪ فوروارد از …». **انتخاب چندتایی** (نگه داشتن روی پیام یا از منو) برای فوروارد و حذف گروهی.
+- **مدیریت گروه (ادمین):** بن (با امکان حذف پیام‌های کاربر)، اخراج، میوت ۱ ساعته / ۱ روزه / ۷ روزه / همیشگی، رفع میوت، رفع بن، حذف همه‌ی پیام‌های اخیر یک کاربر، حذف گروهی پیام‌های انتخاب‌شده، و گزارش اقدام‌ها با «بازگردانی» تک‌کلیکی.
+- **پیام ناشناس:** هر کسی می‌تواند لینک خصوصی بگیرد و پیام ناشناس دریافت کند — توضیح در بخش زیر.
 
 ### نقش‌ها
 
@@ -140,8 +181,28 @@ The bundled tests (`sh dev/test.sh`, Node 22.5+) check the project's own logic a
 | حذف پیام از تلگرام (در پنل می‌ماند) | ✅ | ❌ |
 | تنظیمات AI، کلید Gemini، پرامپت، تنظیمات کلی | ✅ | ❌ |
 | مدیریت اعضا | ✅ | ❌ |
+| فوروارد، انتخاب چندتایی، جستجو، پین پیام در پنل، قرار دادن چت در دسته‌ها | ✅ | ✅ |
+| پین پیام در خود تلگرام، مدیریت گروه، حذف گروهی، ساخت / ویرایش دسته‌ها، نمای کلی پیام ناشناس | ✅ | ❌ |
 
 آیدی‌های `BOOTSTRAP_ADMINS` (در `tgcloud/lib/config.js`) همیشه ادمین‌اند و از پنل حذف یا تنزل نمی‌شوند؛ پس هرگز از پنل قفل نمی‌شوید.
+
+### پیام ناشناس
+
+مثل ربات‌های معروف «پیام ناشناس»:
+
+۱. هر کسی در پیوی ربات `/anon` بفرستد، یک لینک خصوصی `https://t.me/<bot>?start=anon_<token>` می‌گیرد.
+۲. هر کس لینک را باز کند می‌تواند برای مالک لینک بنویسد. مالک پیام را به‌صورت **«📩 ناشناس #۳»** می‌بیند — بدون نام و بدون آیدی — همراه دکمه‌های **بلاک** و **گزارش**. متن، عکس، ویدیو، ویس، فایل، استیکر و ویدیو مسیج پشتیبانی می‌شود.
+۳. مالک روی پیام **Reply** می‌زند و پاسخ، ناشناس به فرستنده می‌رسد. گفتگو می‌تواند دوطرفه ادامه پیدا کند.
+۴. مالک می‌تواند لینک را خاموش / روشن کند، لینک جدید بسازد (لینک قبلی باطل می‌شود)، آمار ساده ببیند (`/anon stats`)، فرستنده را بلاک کند یا پیام را گزارش دهد. فرستنده با `/stop` از این حالت خارج می‌شود.
+
+حریم خصوصی و ایمنی در طراحی:
+
+- آیدی فرستنده هرگز برای مالک لینک فرستاده نمی‌شود؛ پیام‌ها با `sendMessage` / `copyMessage` منتقل می‌شوند (بدون «فوروارد از …»).
+- این پیام‌ها **هرگز وارد چت‌های پنل و جدول `messages` نمی‌شوند.** فقط یک جدول کوچک مسیریابی (آیدی‌ها و زمان، بدون متن) نگه داشته می‌شود که بعد از `anon_retention_days` (پیش‌فرض ۱۴ روز) پاک می‌شود.
+- **شفافیت با فرستنده:** ربات به او می‌گوید اگر پیامی گزارش شود، ادمین‌های ربات آن پیام و آیدی فرستنده را می‌بینند. **گزارش**، پیام را برای ادمین‌ها کپی می‌کند و دکمه‌ی **بلاک سراسری** تک‌کلیکی می‌دهد.
+- محدودیت سوءاستفاده: سقف نرخ برای هر فرستنده (`anon_rate_per_hour`، پیش‌فرض ۳۰)، بلاک شخصی و سراسری، کلید خاموش / روشن کلی. به فرستنده‌ی بلاک‌شده و به لینکِ خاموش، پاسخ خنثای یکسانی داده می‌شود.
+- ادمین‌ها در پنل (منو ← 🕶 پیام ناشناس) آمار ساده را می‌بینند و بلاک‌های سراسری را مدیریت می‌کنند. متن پیام‌ها ذخیره نمی‌شود، پس آنجا قابل نمایش نیست.
+- به‌عنوان مالک ربات، از نظر فنی کد و دیتابیس دست شماست؛ طراحی فقط جلوی ذخیره‌ی متن پیام‌ها را می‌گیرد.
 
 ### منطق کار
 
@@ -156,11 +217,13 @@ The bundled tests (`sh dev/test.sh`, Node 22.5+) check the project's own logic a
 
 ```
 tgcloud/
-  schema.js        members، settings، connections، chats، messages، edits، media، upload_parts، reads
+  schema.js        members، settings، connections، chats، messages، edits، media، upload_parts، reads،
+                   categories، chat_categories، mod_log، anon_links / sessions / messages / aliases / blocks
   handlers/        مدیریت آپدیت‌های تلگرام
-  endpoints/       boot، chats، messages، send، upload، media، react، editMessage، editHistory،
-                   deleteMessage، chatPrefs، settings، members، prefs
-  lib/             config، store، auth، ingest، ai، media، notify، edits، tg، util، b64
+  endpoints/       boot، chats، messages، send، upload، media، react، editMessage، editHistory، deleteMessage،
+                   deleteMessages، forward، pinMessage، search، categories، groupMod، chatPrefs، settings،
+                   members، prefs، anonAdmin
+  lib/             config، store، auth، ingest، ai، anon، media، notify، edits، tg، util، b64
 web/               Mini App (‏index.html، app.js، style.css) — بدون build
 dev/               تست‌های محلی روی SDK ساختگی + SQLite  (sh dev/test.sh)
 tgcloud.jsonc  package.json
@@ -198,8 +261,14 @@ tgcloud.jsonc  package.json
 ۴. **حذف / ویرایش / ری‌اکشن بیزینسی** به دسترسی‌های Telegram Business بستگی دارند؛ خطاها در پنل به‌صورت پیام خوانا نشان داده می‌شوند.
 ۵. **ویس از Mini App.** مرورگر داخلی تلگرام ممکن است ogg، m4a یا webm ضبط کند. پنل `voice ← audio ← document` را امتحان می‌کند؛ اگر webm تولید شود ویس واقعی نمی‌شود و باید تبدیل به ogg اضافه شود.
 ۶. **سقف حجم JSON و حجم دیتابیس** در مستندات مشخص نیست. اگر پاسخ‌ها رد شدند، `CHUNK` را در `endpoints/media.js` و `web/app.js` / `endpoints/upload.js` کم کنید؛ حجم ذخیره‌سازی را با `archive_max_mb` و `archive_media` محدود کنید.
+۷. **فراخوانی‌های جدیدتر Bot API:** `copyMessage` (انتقال ناشناس)، `banChatMember`، `restrictChatMember`، `deleteMessages` و `pinChatMessage` همراه `business_connection_id`. به دسترسی ربات در هر گروه / اتصال بیزینس بستگی دارند؛ خطاها به‌صورت پیام خوانا نشان داده می‌شوند.
+۸. **توکن تصادفی:** لینک‌های ناشناس از `crypto.getRandomValues` استفاده می‌کنند؛ اگر در محیط اجرا نبود به `Math.random` برمی‌گردد — چون لینک یک راز است، بررسی کنید کدام فعال است.
+۹. **جستجوی پیام‌ها** با `LIKE` روی جدول `messages` انجام می‌شود: برای ده‌ها هزار پیام مناسب است؛ برای آرشیو خیلی بزرگ سرعتش را روی پلتفرم بسنجید.
 
-تست‌های همراه پروژه (`sh dev/test.sh`، نیازمند Node 22.5+) منطق خود پروژه را روی SDK ساختگی و SQLite می‌سنجند — رفتار واقعی پلتفرم را ثابت نمی‌کنند.
+تست‌های همراه پروژه منطق خود پروژه را روی SDK ساختگی و SQLite می‌سنجند — رفتار واقعی پلتفرم را ثابت نمی‌کنند:
+
+- `sh dev/test.sh` (نیازمند Node 22.5+) — ۱۲۷ بررسی بک‌اند: آرشیو، تایمر AI، نقش‌ها، فوروارد، پین، دسته‌بندی، جستجو، مدیریت گروه و پیام ناشناس (از جمله «هیچ ردی از فرستنده به مالک نمی‌رسد»).
+- `sh dev/ui-test.sh` — Mini App را در Chromium واقعی (Playwright) روی همان بک‌اند باز می‌کند، سناریوهای اصلی را کلیک می‌زند، اسکرین‌شات می‌گیرد و با هر خطای JavaScript یا متن سرگردان `null` / `false` شکست می‌خورد.
 
 ### تفاوت با نسخه‌ی Hugging Face
 
@@ -214,7 +283,8 @@ tgcloud.jsonc  package.json
 | حافظه‌ی AI | N پیام آخر | کل تاریخچه |
 | رسانه | بایت‌ها در دیتابیس آرشیو می‌شوند، انتقال تکه‌تکه، بدون ffmpeg | استریم از تلگرام با `file_id`، Range، ffmpeg |
 | پیام‌های حذف‌شده | علامت 🗑 می‌خورند و محتوا می‌ماند؛ تاریخچه‌ی ویرایش نگه داشته می‌شود | تاریخچه می‌ماند؛ حذف علامت نمی‌خورد |
-| هنوز منتقل نشده | مدیریت گروه، پنل استیکر / گیف، فوروارد، پین داخل چت، ویرایش پروفایل ربات، عکس پروفایل، استیکرهای متحرک (tgs) | — |
+| پیام ناشناس، دسته‌بندی چت، جستجوی متنی پیام‌ها | ✅ | ❌ (فقط فیلتر لیست چت) |
+| هنوز منتقل نشده | پنل استیکر / گیف، ویرایش پروفایل ربات، عکس پروفایل، استیکرهای متحرک (tgs) | — |
 
 </div>
 
@@ -239,6 +309,12 @@ tgcloud.jsonc  package.json
 - **Медиа в панели:** фото, видео, GIF, голосовые, аудио, стикеры (статичные / видео), файлы — просмотр и отправка (кнопка вложения и запись голоса).
 - **Панель:** список чатов с поиском, счётчики непрочитанного, закрепление / отключение уведомлений, фильтры «Все / Медиа / Удалённые», ответ, реакции, правка, удаление (admin), история правок, режим и промпт ИИ для каждого чата, общие настройки, управление участниками.
 - **Команды для контактов:** `/start`, `/send_msg <текст>` (пересылает сообщение администраторам).
+- **Категории чатов:** общие вкладки в списке чатов (⭐ VIP, Коллеги, …) рядом со встроенными «Все / Непрочитанные / Личные / Группы». Администраторы создают, переименовывают, упорядочивают и удаляют категории; любой участник может поместить чат в одну или несколько категорий. Закреплённый чат остаётся наверху.
+- **Поиск:** фильтр списка чатов, **полнотекстовый поиск по всем сообщениям** (включая удалённые, с подсветкой) и поиск внутри чата. Нажатие на результат переносит к сообщению вместе с окружающей перепиской.
+- **Закрепление сообщения** внутри чата (баннер сверху; администраторы закрепляют и в самом Telegram) и **закрепление чата** в списке.
+- **Пересылка** одного или нескольких сообщений в один или несколько чатов (отправляются заново из архива, поэтому работает и для бизнес-чатов) с необязательной пометкой «↪ переслано от …». **Множественный выбор** (долгое нажатие или меню) для пересылки и массового удаления.
+- **Модерация групп (admin):** бан (с возможностью удалить сообщения пользователя), исключение, мьют на 1 час / 1 день / 7 дней / навсегда, снятие мьюта и бана, удаление всех недавних сообщений пользователя, массовое удаление выбранных сообщений и журнал действий с отменой в одно касание.
+- **Анонимные сообщения:** любой может получить приватную ссылку и принимать анонимные сообщения — см. раздел ниже.
 
 ### Роли
 
@@ -249,8 +325,28 @@ tgcloud.jsonc  package.json
 | Удаление сообщения в Telegram (в панели остаётся) | ✅ | ❌ |
 | Настройки ИИ, ключ Gemini, промпт, общие настройки | ✅ | ❌ |
 | Управление участниками | ✅ | ❌ |
+| Пересылка, множественный выбор, поиск, закрепление сообщения в панели, помещение чата в категории | ✅ | ✅ |
+| Закрепление сообщения в Telegram, модерация групп, массовое удаление, создание / правка категорий, обзор анонимных сообщений | ✅ | ❌ |
 
 ID из `BOOTSTRAP_ADMINS` (`tgcloud/lib/config.js`) всегда остаются администраторами и не могут быть удалены или понижены из панели — заблокировать себя невозможно.
+
+### Анонимные сообщения
+
+Как в популярных ботах «анонимных сообщений»:
+
+1. Любой отправляет боту в личке `/anon` и получает приватную ссылку `https://t.me/<bot>?start=anon_<token>`.
+2. Любой, кто откроет ссылку, может написать её владельцу. Владелец получает сообщение как **«📩 Аноним #3»** — без имени и без ID — с кнопками **«Заблокировать»** и **«Пожаловаться»**. Поддерживаются текст, фото, видео, голосовые, файлы, стикеры и круглые видео.
+3. Владелец отвечает через **Reply** на сообщение, и ответ приходит отправителю анонимно. Переписка может продолжаться в обе стороны.
+4. Владелец может выключить / включить ссылку, создать новую (старая перестаёт работать), посмотреть простую статистику (`/anon stats`), заблокировать отправителя или пожаловаться на сообщение. Отправитель выходит из режима командой `/stop`.
+
+Приватность и безопасность в основе конструкции:
+
+- ID отправителя никогда не передаётся владельцу ссылки; сообщения пересылаются через `sendMessage` / `copyMessage` (без «переслано от …»).
+- Эти сообщения **никогда не попадают в чаты панели и таблицу `messages`**. Хранится лишь небольшая таблица маршрутизации (идентификаторы и время, без текста), которая очищается через `anon_retention_days` (по умолчанию 14).
+- **Честное предупреждение отправителю:** бот сообщает, что при жалобе администраторы бота увидят это сообщение и ID отправителя. **Жалоба** копирует сообщение администраторам и предлагает **глобальную блокировку** в одно касание.
+- Защита от злоупотреблений: лимит частоты для каждого отправителя (`anon_rate_per_hour`, по умолчанию 30), личные и глобальные блокировки, общий выключатель. Заблокированный отправитель и выключенная ссылка получают одинаковый нейтральный ответ.
+- Администраторы видят простую статистику и управляют глобальными блокировками в панели (меню → 🕶 Анонимные сообщения). Тексты сообщений не хранятся, поэтому показать их там нельзя.
+- Как оператор бота вы технически контролируете код и базу данных; конструкция лишь не сохраняет тексты сообщений.
 
 ### Как это работает
 
@@ -265,11 +361,13 @@ ID из `BOOTSTRAP_ADMINS` (`tgcloud/lib/config.js`) всегда остаютс
 
 ```
 tgcloud/
-  schema.js        members, settings, connections, chats, messages, edits, media, upload_parts, reads
+  schema.js        members, settings, connections, chats, messages, edits, media, upload_parts, reads,
+                   categories, chat_categories, mod_log, anon_links / sessions / messages / aliases / blocks
   handlers/        обработчики обновлений Telegram
-  endpoints/       boot, chats, messages, send, upload, media, react, editMessage, editHistory,
-                   deleteMessage, chatPrefs, settings, members, prefs
-  lib/             config, store, auth, ingest, ai, media, notify, edits, tg, util, b64
+  endpoints/       boot, chats, messages, send, upload, media, react, editMessage, editHistory, deleteMessage,
+                   deleteMessages, forward, pinMessage, search, categories, groupMod, chatPrefs, settings,
+                   members, prefs, anonAdmin
+  lib/             config, store, auth, ingest, ai, anon, media, notify, edits, tg, util, b64
 web/               Mini App (index.html, app.js, style.css) — без сборки
 dev/               локальные тесты на мок-SDK + SQLite  (sh dev/test.sh)
 tgcloud.jsonc  package.json
@@ -307,8 +405,14 @@ tgcloud.jsonc  package.json
 4. **Удаление / правка / реакции в бизнес-чатах** зависят от прав, выданных в Telegram Business; ошибки показываются в панели читаемыми сообщениями.
 5. **Голосовые из Mini App.** Веб-вью Telegram может записывать ogg, m4a или webm. Панель пробует `voice → audio → document`; если получится webm, настоящим голосовым оно не станет — потребуется конвертация в ogg.
 6. **Лимиты размера JSON и размера базы** в документации не указаны. Если ответы отклоняются, уменьшите `CHUNK` в `endpoints/media.js` и `web/app.js` / `endpoints/upload.js`; ограничивайте хранилище через `archive_max_mb` и `archive_media`.
+7. **Более новые методы Bot API:** `copyMessage` (анонимная передача), `banChatMember`, `restrictChatMember`, `deleteMessages` и `pinChatMessage` с `business_connection_id`. Они зависят от прав бота в каждой группе / бизнес-подключении; ошибки показываются читаемыми сообщениями.
+8. **Случайные токены:** анонимные ссылки используют `crypto.getRandomValues`; если в среде его нет, применяется `Math.random` — проверьте, что именно работает, ведь ссылка является секретом.
+9. **Поиск по сообщениям** выполняется через SQL `LIKE` по таблице `messages`: подходит для десятков тысяч сообщений; для очень большого архива проверьте скорость на платформе.
 
-Встроенные тесты (`sh dev/test.sh`, Node 22.5+) проверяют логику самого проекта на мок-SDK и SQLite — они не доказывают поведение реальной платформы.
+Встроенные тесты проверяют логику самого проекта на мок-SDK и SQLite — они не доказывают поведение реальной платформы:
+
+- `sh dev/test.sh` (Node 22.5+) — 127 проверок бэкенда: архив, таймер ИИ, роли, пересылка, закрепление, категории, поиск, модерация групп, анонимные сообщения (включая «никаких следов отправителя у владельца»).
+- `sh dev/ui-test.sh` — открывает Mini App в настоящем Chromium (Playwright) поверх того же бэкенда, проходит основные сценарии, делает скриншоты и падает при любой ошибке JavaScript или лишнем тексте `null` / `false`.
 
 ### Отличия от версии для Hugging Face
 
@@ -323,4 +427,5 @@ tgcloud.jsonc  package.json
 | Контекст ИИ | Последние N сообщений | Вся история |
 | Медиа | Байты в базе, передача частями, без ffmpeg | Стриминг из Telegram по `file_id`, Range, ffmpeg |
 | Удалённые сообщения | Помечаются 🗑, содержимое остаётся; история правок сохраняется | История сохраняется; удаление не помечается |
-| Ещё не перенесено | Модерация групп, панель стикеров / GIF, пересылка, закрепление в чате, редактирование профиля бота, фото профиля, анимированные (tgs) стикеры | — |
+| Анонимные сообщения, категории чатов, полнотекстовый поиск по сообщениям | ✅ | ❌ (только фильтр списка чатов) |
+| Ещё не перенесено | Панель стикеров / GIF, редактирование профиля бота, фото профиля, анимированные (tgs) стикеры | — |

@@ -66,6 +66,7 @@ export const messages = table('messages', {
   editedAt:      integer('edited_at'),
   deletedAt:     integer('deleted_at'),
   deletedBy:     text('deleted_by'),
+  pinnedAt:      integer('pinned_at'),                  // سنجاق‌شده داخل چت (زمان سنجاق)
 }, (t) => ({
   byChat: index('idx_messages_chat').on(t.chatId, t.id),
   byTg:   index('idx_messages_tg').on(t.chatId, t.msgId),
@@ -107,4 +108,87 @@ export const reads = table('reads', {
   tgId:   integer('tg_id').notNull(),
   chatId: integer('chat_id').notNull(),
   lastId: integer('last_id').notNull().default(0),
+});
+
+// ─── دسته‌بندی چت‌ها (مشترک بین همه‌ی اعضا؛ ساخت/ویرایش با ادمین، انتساب با همه) ───
+export const categories = table('categories', {
+  id:        integer('id').primaryKey({ autoIncrement: true }),
+  name:      text('name').notNull(),
+  emoji:     text('emoji').notNull().default(''),
+  sort:      integer('sort').notNull().default(0),
+  createdAt: integer('created_at'),
+});
+
+export const chatCategories = table('chat_categories', {
+  key:    text('key').primaryKey(),                    // <chatId>:<catId>
+  chatId: integer('chat_id').notNull(),
+  catId:  integer('cat_id').notNull(),
+}, (t) => ({
+  byChat: index('idx_chat_categories_chat').on(t.chatId),
+  byCat:  index('idx_chat_categories_cat').on(t.catId),
+}));
+
+// ─── گزارش اقدام‌های مدیریت گروه ───
+export const modLog = table('mod_log', {
+  id:         integer('id').primaryKey({ autoIncrement: true }),
+  chatId:     integer('chat_id').notNull(),
+  targetId:   integer('target_id'),
+  targetName: text('target_name').default(''),
+  action:     text('action').notNull(),                // ban | unban | mute | unmute | kick | delete_user | delete_bulk
+  untilTs:    integer('until_ts'),
+  count:      integer('count'),
+  byId:       integer('by_id'),
+  byName:     text('by_name').default(''),
+  ts:         integer('ts').notNull(),
+}, (t) => ({ byChat: index('idx_mod_log_chat').on(t.chatId, t.id) }));
+
+// ─── پیام ناشناس ───
+// لینک خصوصی هر نفر (مالک). مالک = آیدی عددی تلگرامِ کسی که /anon زده؛ لزوماً عضو پنل نیست.
+export const anonLinks = table('anon_links', {
+  token:     text('token').primaryKey(),
+  ownerId:   integer('owner_id').notNull(),
+  ownerName: text('owner_name').default(''),
+  enabled:   boolean('enabled').notNull().default(true),
+  uses:      integer('uses').notNull().default(0),
+  createdAt: integer('created_at'),
+}, (t) => ({ byOwner: index('idx_anon_links_owner').on(t.ownerId) }));
+
+// هر فرستنده در هر لحظه فقط به یک لینک وصله (تا /stop یا لینک دیگر)
+export const anonSessions = table('anon_sessions', {
+  senderId: integer('sender_id').primaryKey(),
+  token:    text('token').notNull(),
+  ts:       integer('ts').notNull(),
+});
+
+// فقط برای مسیریابی پاسخ و محدودیت نرخ؛ متن پیام اینجا ذخیره نمی‌شود. پس از anon_retention_days پاک می‌شود.
+export const anonMessages = table('anon_messages', {
+  id:          integer('id').primaryKey({ autoIncrement: true }),
+  ref:         text('ref').notNull(),                  // شناسه‌ی کوتاه برای دکمه‌های زیر پیام
+  dir:         text('dir').notNull(),                  // in (فرستنده→مالک) | out (مالک→فرستنده)
+  ownerId:     integer('owner_id').notNull(),
+  senderId:    integer('sender_id').notNull(),
+  ownerMsgId:  integer('owner_msg_id'),                // آیدی پیام در چت مالک با ربات
+  ts:          integer('ts').notNull(),
+}, (t) => ({
+  byRef:   index('idx_anon_messages_ref').on(t.ref),
+  byOwner: index('idx_anon_messages_owner').on(t.ownerId, t.ownerMsgId),
+  bySender: index('idx_anon_messages_sender').on(t.senderId, t.ts),
+}));
+
+// شماره‌ی ثابت «ناشناس #N» برای هر فرستنده نزد هر مالک
+export const anonAliases = table('anon_aliases', {
+  key:      text('key').primaryKey(),                  // <ownerId>:<senderId>
+  ownerId:  integer('owner_id').notNull(),
+  senderId: integer('sender_id').notNull(),
+  n:        integer('n').notNull(),
+  ts:       integer('ts'),
+}, (t) => ({ byOwner: index('idx_anon_aliases_owner').on(t.ownerId) }));
+
+// بلاک: ownerId=0 یعنی بلاک سراسری (توسط ادمین ربات)
+export const anonBlocks = table('anon_blocks', {
+  key:      text('key').primaryKey(),                  // <ownerId>:<senderId>
+  ownerId:  integer('owner_id').notNull(),
+  senderId: integer('sender_id').notNull(),
+  by:       text('by').default(''),
+  ts:       integer('ts'),
 });

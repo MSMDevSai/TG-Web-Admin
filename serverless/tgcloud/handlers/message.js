@@ -2,12 +2,15 @@ import { api } from 'sdk';
 import { ingest } from '../lib/ingest.js';
 import { memberRole } from '../lib/store.js';
 import { WEBAPP_URL } from '../lib/config.js';
+import { tryHandle as anonHandle } from '../lib/anon.js';
 import { db } from 'sdk';
 import { eq } from 'sdk/db';
 import { members } from '../schema.js';
 
 // پیام‌های مستقیم به ربات. اعضای پنل فقط دستور می‌گیرن؛ بقیه مثل یک چت عادی ذخیره و (در صورت فعال بودن) جواب داده می‌شن.
 export default async function (msg) {
+  // پیام ناشناس اول بررسی می‌شود تا هرگز وارد ذخیره‌ی عادی چت‌ها (پنل) نشود
+  if (await anonHandle(msg)) return;
   if (msg.chat.type === 'private' && msg.from) {
     const role = await memberRole(msg.from.id);
     if (role) { await memberDm(msg, role); return; }

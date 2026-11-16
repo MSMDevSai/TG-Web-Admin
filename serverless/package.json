@@ -5,7 +5,8 @@
   "scripts": {
     "deploy": "tgcloud push",
     "status": "tgcloud status",
-    "test": "sh dev/test.sh"
+    "test": "sh dev/test.sh",
+    "test:ui": "sh dev/ui-test.sh"
   },
   "devDependencies": {
     "@tgcloud/cli": "^0.2.0"
