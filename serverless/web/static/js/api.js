@@ -4,7 +4,8 @@
 //    2. callCond(name, input) → polling با ETag-like vis client-side hash
 // ══════════════════════════════════════════════════════════════
 var SESSION = localStorage.getItem('TG_SESSION') || '';
-var IS_TELEGRAM = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user);
+var IS_TELEGRAM = !!(window.Telegram && window.Telegram.WebApp &&
+  ((window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) || window.Telegram.WebApp.initData));
 
 // داخل تلگرام: Serverless.call (initData توسط پلتفرم تأیید می‌شود)
 function callTg(name, input) {
@@ -24,18 +25,36 @@ function callTg(name, input) {
 }
 
 // خارج تلگرام: fetch عادی به /api/<name> با Authorization: <SESSION>
+// (پلتفرم پاسخ را در {ok, result} می‌پیچد؛ همان result را برمی‌گردانیم تا شکل
+//  پاسخ با مسیر Serverless.call یکسان باشد.)
 async function fetchWeb(path, opts = {}) {
   opts.headers = opts.headers || {};
   opts.headers['Authorization'] = SESSION;
   try {
     const r = await fetch('/api/' + path, opts);
     if (r.status === 401) {
+      // initData is required by the platform — a panel session alone is not enough.
+      // Drop the stored token and hand control back to the sign-in card (no reload loop).
       localStorage.removeItem('TG_SESSION');
       SESSION = '';
-      location.reload();
+      if (typeof showToast === 'function') showToast('جلسه معتبر نیست؛ لطفاً دوباره وارد شوید.', 'error');
+      if (!IS_TELEGRAM) {
+        const app = document.getElementById('app'); if (app) app.classList.add('d-none');
+        if (typeof finishSplash === 'function') finishSplash(true);
+        else { const box = document.getElementById('authBox'); if (box) box.classList.remove('d-none'); }
+        if (typeof showAuthMode === 'function') showAuthMode('login');
+      }
       return { error: true };
     }
-    return await r.json();
+    let j = null;
+    try { j = await r.json(); } catch (e) { j = null; }
+    if (!r.ok) {
+      // Platform errors: {ok:false, description, parameters} (EndpointError → 400).
+      const description = (j && (j.description || j.message || (j.error && (j.error.message || j.error.description)))) || ('خطای سرور (' + r.status + ')');
+      return { error: description, code: (j && (j.code || j.type || (j.error && j.error.code))) || null, parameters: (j && (j.parameters || (j.error && j.error.parameters))) || null };
+    }
+    if (j && typeof j === 'object' && j.ok === true && 'result' in j) return j.result;
+    return j;
   } catch (e) {
     return null;
   }

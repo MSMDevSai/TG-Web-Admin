@@ -8,18 +8,25 @@ function loadMedia(key) {
   if (mediaCache.has(key)) return mediaCache.get(key);
   const p = (async () => {
     let part = 0, parts = 1, mime = '', chunks = [];
-    while (part < parts) {
-      const r = await call('media', { key, part });
-      parts = r.parts; mime = r.mime; chunks.push(b64ToU8(r.b64)); part++;
+    try {
+      while (part < parts) {
+        const r = await call('media', { key, part });
+        if (!r || r.error) throw new Error((r && r.error) || 'رسانه در دسترس نیست');
+        parts = r.parts; mime = r.mime; chunks.push(b64ToU8(r.b64)); part++;
+      }
+      return { url: URL.createObjectURL(new Blob(chunks, { type: mime })), mime };
+    } catch (e) {
+      mediaCache.delete(key);
+      if (typeof showToast === 'function') showToast((e && e.message) || 'رسانه در دسترس نیست', 'error');
+      return { url: '', mime, error: true };
     }
-    return { url: URL.createObjectURL(new Blob(chunks, { type: mime })), mime };
   })();
-  mediaCache.set(key, p); p.catch(() => mediaCache.delete(key));
+  mediaCache.set(key, p);
   return p;
 }
 function b64ToU8(b) { const s = atob(b); const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 
-function fmtTime(sec) {
+function fmtDur(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0;
   const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
   return m + ':' + String(s).padStart(2, '0');
@@ -51,9 +58,9 @@ function mkPlayer(fileKey, kind) {
   el.addEventListener('timeupdate', () => {
     const pct = el.duration ? (el.currentTime / el.duration) * 100 : 0;
     barFill.style.width = pct + '%';
-    time.textContent = fmtTime(el.duration ? el.duration - el.currentTime : el.currentTime);
+    time.textContent = fmtDur(el.duration ? el.duration - el.currentTime : el.currentTime);
   });
-  el.addEventListener('loadedmetadata', () => { time.textContent = fmtTime(el.duration); });
+  el.addEventListener('loadedmetadata', () => { time.textContent = fmtDur(el.duration); });
   el.addEventListener('ended', () => { playBtn.innerHTML = '<i class="bi bi-play-fill"></i>'; });
   bar.addEventListener('click', e => {
     const r = bar.getBoundingClientRect();
@@ -82,6 +89,7 @@ function mkPlayer(fileKey, kind) {
 async function downloadMedia(fileKey, filename) {
   try {
     const { url } = await loadMedia(fileKey);
+    if (!url) return;
     const a = document.createElement('a');
     a.href = url; a.download = filename || 'file';
     document.body.appendChild(a); a.click(); a.remove();
@@ -117,7 +125,7 @@ function bumpReactFreq(em) { if (!em) return; const f = getReactFreq(); f[em] = 
 function sortByFreq(list) { const f = getReactFreq(); return [...list].sort((a, b) => (f[b] || 0) - (f[a] || 0)); }
 
 async function doReact(chatId, msgId, emoji) {
-  const res = await call('react', { chatId, msgId, emoji });
+  const res = await safeCall('react', { chatId, msgId, emoji });
   if (res?.error) showToast(res.error, 'error'); else { bumpReactFreq(emoji); fetchHistory(chatId, false); }
 }
 
@@ -153,14 +161,14 @@ function mkReactBar(chatId, msgId, mine) {
 
 function mkReactionChips(m, isOut) {
   const chips = [];
-  if (m.their_reaction) chips.push({ emoji: m.their_reaction, mine: false, label: 'کاربر' });
-  if (m.my_reaction) chips.push({ emoji: m.my_reaction, mine: true, label: 'من' });
+  if (m.theirReaction) chips.push({ emoji: m.theirReaction, mine: false, label: 'کاربر' });
+  if (m.myReaction) chips.push({ emoji: m.myReaction, mine: true, label: 'من' });
   if (!chips.length) return null;
   const row = document.createElement('div'); row.className = 'reaction-row' + (isOut ? ' out' : '');
   chips.forEach(c => {
     const chip = document.createElement('span'); chip.className = 'rchip' + (c.mine ? ' mine' : '');
     chip.innerHTML = c.emoji + ' <span class="rl">' + c.label + '</span>';
-    if (c.mine) { chip.title = 'برای حذف کلیک کن'; chip.onclick = () => doReact(curChatId, m.id, null); }
+    if (c.mine) { chip.title = 'برای حذف کلیک کن'; chip.onclick = () => doReact(curChatId, m.msgId, null); }
     row.appendChild(chip);
   });
   return row;
@@ -180,7 +188,7 @@ function cancelReply() { replyTarget = null; document.getElementById('rstrip').c
 // ══════════════════════════════════════════════════════════════
 //  Topbar + chat selection
 // ══════════════════════════════════════════════════════════════
-async function selChat(id, title, biz) {
+async function selChat(id, title, biz, fromHistory) {
   curChatId = id; unreadCnt = 0; lastHistHash = ''; cancelReply(); unreadPer[id] = 0; updGlobalUnread();
   if (window.innerWidth <= 768) document.getElementById('sidebar').classList.add('mh');
   document.getElementById('noChat').classList.add('d-none');
@@ -195,13 +203,13 @@ async function selChat(id, title, biz) {
   av.appendChild(img);
   document.getElementById('hdrSub').textContent = 'شناسه: ' + id;
 
-  pushUiState({ level: 'chat', chatId: id });
+  if (!fromHistory) pushUiState({ level: 'chat', chatId: id });
 
   const chatObj = allChats.find(x => x.id === id) || {};
-  isGroup = chatObj.is_group || false;
-  curBizId = chatObj.business_connection_id || biz || null;
+  isGroup = chatObj.isGroup || false;
+  curBizId = chatObj.business || biz || null;
   const hasBiz = !!curBizId;
-  const hasBotDirect = chatObj.has_bot_chat !== undefined ? !!chatObj.has_bot_chat : !hasBiz;
+  const hasBotDirect = chatObj.direct !== undefined ? !!chatObj.direct : !hasBiz;
 
   const ss = document.getElementById('senderSelector');
   const rBot = document.querySelector('input[name="sender"][value="bot"]');
@@ -246,7 +254,11 @@ function applyUiState(state) {
   if (!level) {
     if (curChatId) backList();
   } else if (level === 'chat') {
-    // chat view DOM is already correct
+    const id = Number(state.chatId);
+    if (id && id !== curChatId) {
+      const c = allChats.find(x => x.id === id);
+      selChat(id, c ? c.title : '', c ? c.business : null, true);
+    }
   } else if (level === 'profile') {
     new bootstrap.Modal(document.getElementById('profileModal')).show();
   } else if (level === 'ai') {
@@ -264,6 +276,17 @@ function applyUiState(state) {
 function goBackOneLevel() {
   if (history.state && history.state.level) history.back();
   else backList();
+}
+// Close the current UI level and wait until popstate has been applied.
+function popUiState() {
+  if (!history.state || !history.state.level) return Promise.resolve();
+  return new Promise(resolve => {
+    // applyUiState keeps isApplyingHistoryState set for ~30ms; wait it out so a
+    // following pushUiState() is not swallowed.
+    const done = () => { window.removeEventListener('popstate', done); setTimeout(resolve, 60); };
+    window.addEventListener('popstate', done);
+    history.back();
+  });
 }
 function handleBackButton() { goBackOneLevel(); }
 
@@ -290,7 +313,7 @@ function dateLabel(ts) {
 }
 
 function sameGroup(a, b) {
-  return !!a && !!b && a.role === b.role && a.sender === b.sender && !b.reply_to_preview && !b.forwarded_from;
+  return !!a && !!b && a.role === b.role && a.sender === b.sender && !b.replyPreview && !b.fwd;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -320,7 +343,7 @@ function buildMsgRow(m, prevM) {
   row.className = 'msg-row ' + (isOut ? 'out' : 'in') + (contPrev ? ' grp' : '');
   row.dataset.mid = m.id;
 
-  if (m.forwarded_from) {
+  if (m.fwd) {
     const fl = document.createElement('div'); fl.className = 'fwd-lbl';
     fl.innerHTML = '<i class="bi bi-arrow-90deg-left"></i> فوروارد از ' + m.forwarded_from;
     row.appendChild(fl);
@@ -343,11 +366,11 @@ function buildMsgRow(m, prevM) {
     else if (m.role === 'bot_auto') lbl = '🤖 (ربات خودکار)';
     sn.textContent = lbl; bub.appendChild(sn);
   }
-  if (m.reply_to_preview) {
+  if (m.replyPreview) {
     const rq = document.createElement('div'); rq.className = 'rq';
     rq.setAttribute('role', 'button'); rq.tabIndex = 0; rq.title = 'رفتن به پیام اصلی';
     const ri = document.createElement('i'); ri.className = 'bi bi-reply-fill'; ri.style.flexShrink = '0';
-    const rs = document.createElement('span'); rs.textContent = m.reply_to_preview;
+    const rs = document.createElement('span'); rs.textContent = m.replyPreview;
     rq.append(ri, rs);
     const goOriginal = ev => { ev.stopPropagation(); jumpToReplied(m); };
     rq.addEventListener('click', goOriginal);
@@ -362,7 +385,7 @@ function buildMsgRow(m, prevM) {
 
   const foot = document.createElement('div'); foot.className = 'msg-foot';
   if (m.text) { const td = document.createElement('div'); td.style.whiteSpace = 'pre-wrap'; td.textContent = m.text; foot.appendChild(td); }
-  const ts = document.createElement('span'); ts.className = 'msg-time'; ts.textContent = m.time || '';
+  const ts = document.createElement('span'); ts.className = 'msg-time'; ts.textContent = m.ts ? fmtTime(m.ts) : '';
   foot.appendChild(ts);
   bub.appendChild(foot);
 
@@ -377,14 +400,14 @@ function buildMsgRow(m, prevM) {
     let rb = null;
     rbBtn.onclick = e => {
       e.stopPropagation();
-      if (!rb) { const made = mkReactBar(curChatId, m.id, m.myReaction); rb = made.bar; bar.appendChild(made.wrap); }
+      if (!rb) { const made = mkReactBar(curChatId, m.msgId, m.myReaction); rb = made.bar; bar.appendChild(made.wrap); }
       document.querySelectorAll('.react-bar.show').forEach(x => { if (x !== rb) x.classList.remove('show'); });
       rb.classList.toggle('show');
     };
     bar.appendChild(rbBtn);
 
     const replyBtn = document.createElement('span'); replyBtn.className = 'tbb'; replyBtn.innerHTML = '<i class="bi bi-reply"></i>'; replyBtn.title = 'ریپلای';
-    replyBtn.onclick = () => setReply(m.id, (m.sender || '') + ': ' + (m.text || '[رسانه]'));
+    replyBtn.onclick = () => setReply(m.msgId, (m.sender || '') + ': ' + (m.text || '[رسانه]'));
     bar.appendChild(replyBtn);
 
     if (m.role === 'admin' || m.role === 'owner' || m.role === 'bot_auto' || m.role === 'model') {
@@ -442,13 +465,28 @@ function appendRows(newItems) {
   if (prevLast) fixGroupTail(prevLast.id);
 }
 
+// The chat list carries the summary fields; the messages endpoint returns the
+// authoritative per-chat meta (ai mode / prompt / mute / pin). Merge it in so
+// the profile and chat-settings dialogs show current values.
+function applyChatMeta(chatId, hist) {
+  if (!hist || !hist.chat) return;
+  const c = allChats.find(x => x.id === chatId);
+  if (!c) return;
+  const meta = hist.chat;
+  for (const k of ['aiMode', 'prompt', 'muted', 'pinned', 'isGroup', 'business', 'direct', 'title', 'kind']) {
+    if (meta[k] !== undefined) c[k] = meta[k];
+  }
+}
+
 async function fetchHistory(chatId, silent) {
   if (!chatId) return;
   if (!silent) {
     loadedMsgs = []; oldestLoadedId = null; hasMoreOlder = true; lastHistHash = '';
     const hist = await callCond('messages', { chatId, limit: PAGE_SIZE });
     if (!hist) return;
+    applyChatMeta(chatId, hist);
     loadedMsgs = hist.messages || hist;
+    if (typeof hist.hasMore === 'boolean') hasMoreOlder = hist.hasMore;
     oldestLoadedId = loadedMsgs.length ? loadedMsgs[0].id : null;
     lastHistHash = JSON.stringify(loadedMsgs);
     renderFullList(loadedMsgs);
@@ -459,6 +497,8 @@ async function fetchHistory(chatId, silent) {
   const hist = await callCond('messages', { chatId, limit: PAGE_SIZE });
   if (!hist || hist.notModified) return;
   if (hist.error) return;
+  applyChatMeta(chatId, hist);
+  if (typeof hist.hasMore === 'boolean') hasMoreOlder = hist.hasMore;
   const hs = JSON.stringify(hist.messages || hist);
   if (hs === lastHistHash) return;
   lastHistHash = hs;
@@ -494,8 +534,8 @@ async function loadOlderMessages() {
   if (!hasMoreOlder || !oldestLoadedId || !curChatId) return;
   const btn = document.getElementById('loadOlderBtn');
   if (btn) btn.textContent = 'در حال بارگذاری...';
-  const older = await call('messages', { chatId: curChatId, limit: PAGE_SIZE, beforeId: oldestLoadedId });
-  if (!older || !older.messages || !older.messages.length) {
+  const older = await safeCall('messages', { chatId: curChatId, limit: PAGE_SIZE, beforeId: oldestLoadedId });
+  if (!older || older.error || !older.messages || !older.messages.length) {
     hasMoreOlder = false;
     if (btn) btn.remove();
     return;
@@ -514,7 +554,8 @@ async function loadOlderMessages() {
   fixGroupTail(older.messages[older.messages.length - 1].id);
   cont.scrollTop = prevScrollTop + (cont.scrollHeight - prevScrollHeight);
   if (btn) btn.textContent = 'بارگذاری پیام‌های قدیمی‌تر';
-  if (older.messages.length < PAGE_SIZE) { hasMoreOlder = false; if (btn) btn.remove(); }
+  if (typeof older.hasMore === 'boolean') hasMoreOlder = older.hasMore;
+  if (!hasMoreOlder || older.messages.length < PAGE_SIZE) { hasMoreOlder = false; if (btn) btn.remove(); }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -667,20 +708,20 @@ function openMsgContextMenu(x, y, m, isOut) {
   reactBox.innerHTML = '';
   sortByFreq(QUICK_REACT).forEach(em => {
     const s = document.createElement('span'); s.textContent = em;
-    s.onclick = () => { doReact(curChatId, m.id, em === m.myReaction ? null : em); closeMsgContextMenu(); };
+    s.onclick = () => { doReact(curChatId, m.msgId, em === m.myReaction ? null : em); closeMsgContextMenu(); };
     reactBox.appendChild(s);
   });
   applyEmojiImages(reactBox);
 
   const items = [];
-  items.push({ icon: 'bi-reply', label: 'ریپلای', fn: () => setReply(m.id, (m.sender || '') + ': ' + (m.text || '[رسانه]')) });
+  items.push({ icon: 'bi-reply', label: 'ریپلای', fn: () => setReply(m.msgId, (m.sender || '') + ': ' + (m.text || '[رسانه]')) });
   if (m.role === 'admin' || m.role === 'owner' || m.role === 'bot_auto' || m.role === 'model') {
     items.push({ icon: 'bi-pencil', label: 'ویرایش', fn: () => editMsg(m.id, m.msgId || '', m.text) });
   }
   if (m.text) items.push({ icon: 'bi-clipboard', label: 'کپی متن', fn: () => { navigator.clipboard?.writeText(m.text); } });
-  items.push({ icon: 'bi-forward', label: 'فوروارد', fn: () => forwardMsg(m.id) });
-  if (curIsGroupForCtx()) items.push({ icon: 'bi-pin-angle', label: 'پین پیام', fn: () => pinMsgById(m.id) });
-  items.push({ icon: 'bi-trash3', label: 'حذف', danger: true, fn: () => deleteMsgById(m.id) });
+  items.push({ icon: 'bi-forward', label: 'فوروارد', fn: () => forwardMsg(m.msgId) });
+  if (curIsGroupForCtx()) items.push({ icon: 'bi-pin-angle', label: 'پین پیام', fn: () => pinMsgById(m.msgId) });
+  items.push({ icon: 'bi-trash3', label: 'حذف', danger: true, fn: () => deleteMsgById(m.msgId) });
 
   itemsBox.innerHTML = '';
   items.forEach(it => {
@@ -706,22 +747,29 @@ document.addEventListener('click', e => {
 });
 
 async function forwardMsg(msgId) {
+  if (!msgId) { showToast('این پیام شناسه‌ی تلگرام ندارد', 'warn'); return; }
   const to = prompt('آیدی عددی چت مقصد برای فوروارد:');
   if (!to) return;
   const selR = document.querySelector('input[name="sender"]:checked');
   const mode = (selR && selR.value === 'me') ? 'me' : 'bot';
-  const res = await call('forward', { chatId: curChatId, msgId, targets: [{ chatId: Number(to), mode }] });
-  if (res?.error) showToast(res.error, 'error'); else showToast('فوروارد شد', 'success');
+  const res = await safeCall('forward', { chatId: curChatId, msgId, targets: [{ chatId: Number(to), mode }] });
+  if (res?.ok === false || res?.error) showToast(res?.error || 'فوروارد نشد', 'error');
+  else showToast('فوروارد شد', 'success');
 }
 
 async function pinMsgById(msgId) {
-  const res = await call('pinMessage', { chatId: curChatId, msgId, businessConnectionId: curBizId });
-  if (res?.error) showToast(res.error, 'error'); else fetchHistory(curChatId, false);
+  if (!msgId) { showToast('این پیام شناسه‌ی تلگرام ندارد', 'warn'); return; }
+  const row = loadedMsgs.find(x => Number(x.msgId) === Number(msgId));
+  const pin = !(row && row.pinnedAt);
+  const res = await safeCall('pinMessage', { chatId: curChatId, msgId, pin });
+  if (res?.error) showToast(res.error, 'error');
+  else { if (res?.tgError) showToast(res.tgError, 'warn', 4000); fetchHistory(curChatId, false); }
 }
 
 async function deleteMsgById(msgId) {
+  if (!msgId) { showToast('این پیام شناسه‌ی تلگرام ندارد', 'warn'); return; }
   if (!confirm('این پیام حذف بشه؟')) return;
-  const res = await call('deleteMessage', { chatId: curChatId, msgId });
+  const res = await safeCall('deleteMessage', { chatId: curChatId, msgId });
   if (res?.error) showToast(res.error, 'error'); else fetchHistory(curChatId, false);
 }
 
@@ -729,17 +777,13 @@ async function deleteMsgById(msgId) {
 async function editMsg(iid, mid, old) {
   const nt = prompt('ویرایش پیام:', old);
   if (!nt || nt === old) return;
-  const res = await call('editMessage', { chatId: curChatId, msgId: mid, text: nt });
+  const res = await safeCall('editMessage', { chatId: curChatId, msgId: mid, text: nt });
   if (res?.ok) fetchHistory(curChatId, false);
   else showToast(res?.error || 'خطا', 'error');
 }
 
 // Delete message
-async function deleteMsgById(msgId) {
-  if (!confirm('این پیام حذف بشه؟')) return;
-  const res = await call('deleteMessage', { chatId: curChatId, msgId });
-  if (res?.error) showToast(res.error, 'error'); else fetchHistory(curChatId, false);
-}
+// (a single definition — the file used to declare deleteMsgById twice)
 
 // Delete chat from panel (UI only — serverless has no dedicated endpoint;
   // content stays in the archive and the chat reappears on new message)
@@ -769,8 +813,8 @@ function updateCsStatus() {
 }
 async function saveChatSettings() {
   if (!curChatId) return;
-  const res = await call('chatPrefs', { chatId: curChatId, aiMode: document.getElementById('csAi').checked ? 'on' : 'off', prompt: document.getElementById('csPrompt').value });
-  if (res?.success) { bootstrap.Modal.getInstance(document.getElementById('chatSP')).hide(); }
+  const res = await safeCall('chatPrefs', { chatId: curChatId, aiMode: document.getElementById('csAi').checked ? 'on' : 'off', prompt: document.getElementById('csPrompt').value });
+  if (res?.ok) { bootstrap.Modal.getInstance(document.getElementById('chatSP')).hide(); }
   else showToast(res?.error || 'خطا', 'error');
 }
 

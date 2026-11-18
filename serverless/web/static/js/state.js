@@ -57,6 +57,18 @@ function showToast(msg, type, ms) {
 }
 
 function toastResult(res, successMsg) {
-  if (res && res.success) showToast(successMsg, 'success');
-  else showToast((res && res.error) || 'خطا', 'error');
+  if (res && (res.ok || res.success)) showToast(successMsg, 'success');
+  else showToast((res && (res.error || res.message)) || 'خطا', 'error');
+}
+
+// `call` rejects on EndpointError/transport failures. For user actions we want a
+// toast instead of an unhandled rejection, plus the {error} shape the call sites
+// already test for.
+async function safeCall(name, input) {
+  try { return await call(name, input); }
+  catch (e) {
+    const msg = (e && (e.message || e.error)) || 'خطا';
+    showToast(msg, 'error');
+    return { error: msg };
+  }
 }

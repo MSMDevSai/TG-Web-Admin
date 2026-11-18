@@ -12,8 +12,8 @@ async function sendMsg() {
   const selR = document.querySelector('input[name="sender"]:checked');
   const mode = (selR && selR.value === 'me') ? 'me' : 'bot';
   const body = { chatId: curChatId, text: txt, mode, businessConnectionId: curBizId };
-  if (replyTarget) body.replyToMsgId = replyTarget.msgId;
-  const res = await call('send', body);
+  if (replyTarget) { body.replyToMsgId = replyTarget.msgId; body.replyPreview = replyTarget.prev; }
+  const res = await safeCall('send', body);
   cancelReply();
   if (res?.error) showToast(res.error, 'error'); else { await fetchHistory(curChatId, false); scrollBot(true); }
 }
@@ -53,10 +53,11 @@ async function uploadMedia(file, type, name) {
       mime: file.type || 'application/octet-stream',
       caption: name,
       replyToMsgId: replyTarget ? replyTarget.msgId : undefined,
+      replyPreview: replyTarget ? replyTarget.prev : undefined,
     };
     let lastRes = null;
     for (let i = 0; i < chunks.length; i++) {
-      lastRes = await call('upload', {
+      lastRes = await safeCall('upload', {
         uploadId, part: i, parts: totalChunks, b64: chunks[i], meta,
       });
       if (i === chunks.length - 1) break; // last part already sent the message
@@ -144,7 +145,7 @@ function stopRec(send) {
         (async () => {
           let lastRes = null;
           for (let i = 0; i < chunks.length; i++) {
-            lastRes = await call('upload', { uploadId, part: i, parts: totalChunks, b64: chunks[i], meta });
+            lastRes = await safeCall('upload', { uploadId, part: i, parts: totalChunks, b64: chunks[i], meta });
             if (i === chunks.length - 1) break;
           }
           cancelReply();
@@ -247,12 +248,17 @@ async function loadStickerPanel() {
   grid.innerHTML = '<div class="sk-empty">در حال بارگذاری...</div>';
   const items = [];
 
-  if (stickerTab === 'sticker') {
-    const recent = await call('media', { type: 'sticker' });
-    (recent || []).forEach(s => items.push({ mediaKey: s.mediaKey, emoji: s.emoji || '🎭', kind: 'sticker' }));
-  } else {
-    const recent = await call('media', { type: 'animation' });
-    (recent || []).forEach(g => items.push({ mediaKey: g.mediaKey, kind: 'animation' }));
+  try {
+    if (stickerTab === 'sticker') {
+      const recent = await call('media', { type: 'sticker' });
+      (recent || []).forEach(s => items.push({ mediaKey: s.mediaKey, emoji: s.emoji || '🎭', kind: 'sticker' }));
+    } else {
+      const recent = await call('media', { type: 'animation' });
+      (recent || []).forEach(g => items.push({ mediaKey: g.mediaKey, kind: 'animation' }));
+    }
+  } catch (e) {
+    grid.innerHTML = '<div class="sk-empty">' + ((e && e.message) || 'بارگذاری استیکرها انجام نشد') + '</div>';
+    return;
   }
 
   grid.innerHTML = '';
@@ -285,7 +291,7 @@ async function loadStickerPanel() {
 
 async function sendStickerFromPanel(mediaKey, kind, emoji) {
   if (!curChatId) return;
-  const res = await call('send', {
+  const res = await safeCall('send', {
     chatId: curChatId,
     text: emoji || '',
     type: kind,

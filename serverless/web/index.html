@@ -3,13 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>try{if(localStorage.getItem("TG_SESSION")||(window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData))document.documentElement.classList.add("has-session")}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>پنل تلگرام</title>
   <meta name="theme-color" content="#10131a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=add,android,arrow_back,attach_file,auto_fix_high,badge,block,chat,check_circle,chevron_right,close,content_copy,delete,description,desktop_windows,devices,done,download,edit,edit_square,error,filter_list,forward,gif_box,group,image,info,install_mobile,keep,key,keyboard_arrow_down,language,logout,manage_accounts,menu,mic,mic_off,mood,movie,notifications,notifications_off,pause,pause_circle,person_add,person_remove,photo_camera,play_arrow,play_circle,reply,search,send,shortcut,smart_toy,sticky_note_2,verified_user,videocam,warning,work&display=block" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Bootstrap CSS: the markup below still uses its grid/utility classes (.container, .h-100, .d-none,
+       .d-flex, .form-control, .btn, .modal …). The M3 stylesheets are layered on top of it exactly like
+       the Hugging Face edition; without it every section renders at once and nothing is centred. -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="/static/css/variables.css" rel="stylesheet">
   <link href="/static/css/icons.css" rel="stylesheet">
   <link href="/static/css/base.css" rel="stylesheet">
@@ -22,6 +28,11 @@
   <link href="/static/css/settings.css" rel="stylesheet">
 </head>
 <body>
+  <!-- shown instead of the sign-in card while a session is being (re)validated — see html.has-session in settings.css -->
+  <div class="splash" id="splash" aria-hidden="true">
+    <div class="brand-orb"><i class="bi bi-telegram"></i></div>
+    <div class="splash-status"><span class="spinner-border spinner-border-sm"></span><span id="splashText">در حال بارگذاری…</span></div>
+  </div>
   <!-- ==================== AUTH Screens (خارج از تلگرام) ==================== -->
   <div id="authBox" class="container h-100 d-flex justify-content-center align-items-center">
     <div class="auth-card text-center">
@@ -43,7 +54,7 @@
 
       <!-- forgot mode -->
       <div id="authForgot" class="d-none">
-        <p class="text-secondary small mb-3">یوزرن임을 بنویسید؛ یک کد بازیابی به تلگرامِ شما ارسال می‌شود.</p>
+        <p class="text-secondary small mb-3">یوزرنیم خود را بنویسید؛ یک کد بازیابی به تلگرامِ شما ارسال می‌شود.</p>
         <input type="text" id="forgotUser" class="form-control mb-3 text-center" placeholder="یوزرنیم">
         <button class="btn btn-primary w-100 py-2" onclick="requestReset()">ارسال کد بازیابی به تلگرام</button>
         <a class="auth-link" onclick="showAuthMode('login')">بازگشت به ورود</a>
@@ -305,10 +316,11 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <label class="form-label small text-secondary">آیدی عددی</label>
-            <input type="text" id="ncId" class="form-control mb-3" placeholder="123456789">
+            <label class="form-label small text-secondary">آیدی عددی یا یوزرنیم</label>
+            <input type="text" id="ncId" class="form-control mb-3" placeholder="123456789 یا @username" dir="ltr">
             <label class="form-label small text-secondary">متن اولین پیام</label>
             <textarea id="ncMsg" class="form-control" rows="3" placeholder="سلام..."></textarea>
+            <p class="text-secondary small mt-2 mb-0">ربات باید قبلاً توسط مخاطب استارت شده باشد.</p>
           </div>
           <div class="modal-footer border-secondary">
             <button class="btn btn-primary w-100" onclick="startNewChat()">ارسال و شروع چت</button>
@@ -398,26 +410,7 @@
       twemoji.parse(el, { folder: 'svg', ext: '.svg', attributes: () => ({ loading: 'lazy', decoding: 'async' }) });
     }
 
-    function showToast(msg, type, ms) {
-      const host = document.getElementById('toastHost');
-      if (!host) { console.log(msg); return; }
-      const t = document.createElement('div');
-      t.className = 'snackbar ' + (type || 'error');
-      const span = document.createElement('span'); span.className = 'sb-msg'; span.textContent = msg;
-      const close = document.createElement('button'); close.className = 'sb-close'; close.innerHTML = '<i class="bi bi-x-lg"></i>';
-      t.append(span, close);
-      host.appendChild(t);
-      let done = false;
-      const dismiss = () => {
-        if (done) return; done = true;
-        t.classList.remove('in'); t.classList.add('out');
-        setTimeout(() => t.remove(), 160);
-      };
-      close.onclick = dismiss;
-      requestAnimationFrame(() => t.classList.add('in'));
-      setTimeout(dismiss, ms || 2000);
-    }
-
+    // showToast() lives in static/js/state.js (single source); this file uses it as a global.
     function fmtTime(ts) { return new Date(ts).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }); }
 
     // ═════════════════════════════════════════════════════════════
@@ -489,30 +482,57 @@
     function initAppFromSession(res){
       S.me = { id: res.telegramId || 0, role: res.role, name: res.username, notify: true };
       pollMs = 3000;
+      finishSplash(false);
       startPoller();
+    }
+
+    // Dismiss the start-up splash. showAuth=true hands over to the sign-in card.
+    function finishSplash(showAuth){
+      const s = document.getElementById('splash');
+      document.documentElement.classList.remove('has-session');
+      if(showAuth){ document.getElementById('authBox').classList.remove('d-none'); if(s) s.remove(); return; }
+      if(!s) return;
+      s.style.display = 'flex';
+      s.classList.add('leaving');
+      setTimeout(()=>s.remove(),260);
+    }
+
+    // Polling loop: refresh the chat list (and the open chat) every pollMs.
+    // Serverless has no websocket bridge, so polling is the only live channel.
+    var pollSkip = 0;
+    function startPoller(){
+      if(pollerID) clearInterval(pollerID);
+      fetchChats(false);
+      if(curChatId) fetchHistory(curChatId,true);
+      pollerID = setInterval(()=>{
+        fetchChats(true);
+        if(curChatId) fetchHistory(curChatId,true);
+      }, pollMs || 3000);
     }
 
     async function initApp(){
       try{
         const r = await call('boot', {});
-        if(!r){ showToast('اتصال برقرار نشد','error'); return; }
+        if(!r){ showToast('اتصال برقرار نشد','error'); finishSplash(true); return; }
         S.me = r.me;
         S.settings = r.settings || {};
         document.getElementById('app').classList.remove('d-none');
         document.getElementById('gAiToggle').checked = S.settings.ai_mode !== false;
         document.getElementById('gPrompt').value = S.settings.system_prompt || '';
-        document.getElementById('gPoll').value = S.settings.poll_interval || 3000;
+        document.getElementById('gPoll').value = localStorage.getItem('pollMs') || S.settings.poll_interval || 3000;
         document.getElementById('gModel').value = S.settings.gemini_model || 'gemini-2.5-flash';
         document.getElementById('gDelay').value = S.settings.ai_delay_seconds || 28;
-        pollMs = Number(S.settings.poll_interval) || 3000;
+        pollMs = Number(localStorage.getItem('pollMs')) || Number(S.settings.poll_interval) || 3000;
+        finishSplash(false);
         startPoller();
       }catch(e){
         showToast('خطا در راه‌اندازی: '+(e&&e.message),'error');
+        finishSplash(true);
       }
     }
 
     // Determine entry mode on load
-    window.onload=function(){
+    window.onload=async function(){
       const tg = window.Telegram && window.Telegram.WebApp;
       if(tg){ try{ tg.ready(); tg.expand(); if(tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }catch(e){} }
 
@@ -541,7 +561,7 @@
       }
 
       // Show login screen
-      document.getElementById('authBox').classList.remove('d-none');
+      finishSplash(true);
       showAuthMode('login');
     };
 
@@ -581,40 +601,47 @@
       showSettingsSub(name);
     }
     async function refreshAiSummary(){
-      const r=await call('settings',{});
-      const s = r && r.settings ? r.settings : r;
-      const el=document.getElementById('spAiSummary');
-      if(el&&s)el.textContent=s.ai_mode?'فعال':'غیرفعال';
+      try{
+        const r=await call('settings',{});
+        const s = r && r.settings ? r.settings : r;
+        const el=document.getElementById('spAiSummary');
+        if(el&&s)el.textContent=s.ai_mode?'فعال':'غیرفعال';
+      }catch(e){/* فقط ادمین */}
     }
     async function refreshAboutPage(){
-      const r=await call('settings',{});
-      const s = r && r.settings ? r.settings : r;
-      if(!s)return;
-      document.getElementById('spAboutModel').textContent=s.gemini_model||'—';
-      document.getElementById('spAboutAiState').textContent=s.ai_mode?'فعال':'غیرفعال';
+      try{
+        const r=await call('settings',{});
+        const s = r && r.settings ? r.settings : r;
+        if(!s)return;
+        document.getElementById('spAboutModel').textContent=s.gemini_model||'—';
+        document.getElementById('spAboutAiState').textContent=s.ai_mode?'فعال':'غیرفعال';
+      }catch(e){/* فقط ادمین */}
     }
 
     async function saveAllSettings(){
       const v=id=>document.getElementById(id).value;
+      const pollVal=Math.max(500,Math.min(parseInt(v('gPoll'))||3000,60000));
+      localStorage.setItem('pollMs',String(pollVal));
       const body={
         op:'save',
         values:{
           ai_mode:document.getElementById('gAiToggle').checked,
           system_prompt:v('gPrompt'),
-          poll_interval:parseInt(v('gPoll'))||3000,
           gemini_model:v('gModel').trim()||'gemini-2.5-flash',
           ai_delay_seconds:parseFloat(v('gDelay'))||28,
         },
       };
-      const res=await call('settings',body);
+      let res=null;
+      try{ res=await call('settings',body); }catch(e){ showToast((e&&e.message)||'خطا در ذخیره','error',5000); return; }
       if(!(res&&res.settings)){showToast(res?.error||'خطا در ذخیره','error',5000);return}
-      pollMs=body.values.poll_interval;startPoller();
+      pollMs=pollVal;startPoller();
       showToast('تنظیمات ذخیره شد','success');goBackOneLevel();
     }
 
     async function loadMembers(){
       const host=document.getElementById('membersList');
-      const res=await call('members',{op:'list'});
+      let res=null;
+      try{ res=await call('members',{op:'list'}); }catch(e){ res=null; }
       if(!res||res.error){host.innerHTML='<div class="pm-empty">بارگذاری نشد</div>';return}
       host.innerHTML='';
       (res.members||[]).forEach(m=>{
@@ -630,7 +657,7 @@
     }
 
     function logout(){
-      call('logout',{token:SESSION}).finally(()=>{
+      safeCall('logout',{token:SESSION}).finally(()=>{
         localStorage.removeItem('TG_SESSION'); SESSION='';
         document.getElementById('app').classList.add('d-none');
         document.getElementById('authBox').classList.remove('d-none');
@@ -644,9 +671,15 @@
       const id=document.getElementById('ncId').value.trim();
       const msg=document.getElementById('ncMsg').value.trim();
       if(!id||!msg){showToast('شناسه و پیام لازم است','warn');return}
-      const res=await call('send',{chatId:id,text:msg,mode:'bot'});
-      if(res?.success||res?.ok){bootstrap.Modal.getInstance(document.getElementById('newChatModal')).hide();document.getElementById('ncId').value='';document.getElementById('ncMsg').value='';lastChatsHash='';await fetchChats(false);selChat(res.resolvedChatId||id,'مخاطب '+id,null)}
-      else showToast(res?.error||'ارسال ناموفق','error')
+      const res=await safeCall('send',{chatId:id,text:msg,mode:'bot',customTitle:'مخاطب '+id});
+      if(!res?.ok){showToast(res?.error||'ارسال ناموفق','error');return}
+      const cid=Number(res.resolvedChatId)||(Number(id)||null);
+      document.getElementById('ncId').value='';document.getElementById('ncMsg').value='';
+      lastChatsHash='';await fetchChats(false);
+      // Drop the modal's history entry, then open the new chat in its place.
+      if(history.state&&history.state.level==='overlay') await popUiState();
+      else bootstrap.Modal.getInstance(document.getElementById('newChatModal')).hide();
+      if(cid)selChat(cid,'مخاطب '+id,null);
     }
 
     async function showProfileModal(){
@@ -670,29 +703,47 @@
     }
 
     async function renderUserProfileBody(body){
-      const res=await call('chats',{chatId:curChatId,profile:true});
+      const p = allChats.find(x=>x.id===curChatId) || {};
       body.innerHTML='';
-      if(!res||res.error){body.innerHTML='<div class="alert alert-warning">پروفایل در دسترس نیست</div>';return}
-      const p=res;
       const img=document.createElement('div');img.className='text-center mb-3';
       const im=document.createElement('div');im.className='person-avatar';im.style.cssText='width:128px;height:128px;margin:0 auto;font-size:3rem';im.textContent=(p.title||curChatId)[0]?.toUpperCase()||'?';
       img.appendChild(im);body.appendChild(img);
-      const rows=[['شناسه',p.id||curChatId,true],['نام',p.title||''],['نوع',p.isGroup?'گروه':'خصوصی']];
-      rows.forEach(([l,v,code])=>{const d=document.createElement('p');d.innerHTML=`<strong>${l}: </strong>`+(code?`<code>${v}</code>`:v);body.appendChild(d)});
+      const typeLbl = p.business ? (p.direct ? 'بیزینس + ربات' : 'بیزینس') : 'ربات';
+      const rows=[['شناسه',p.id||curChatId,true],['نام',p.title||''],['نوع',p.isGroup?'گروه':typeLbl]];
+      rows.forEach(([l,v,code])=>{
+        const d=document.createElement('p');
+        const strong=document.createElement('strong');strong.textContent=l+': ';d.appendChild(strong);
+        if(code){const ce=document.createElement('code');ce.textContent=String(v);d.appendChild(ce)}
+        else d.appendChild(document.createTextNode(String(v)));
+        body.appendChild(d);
+      });
     }
 
     async function renderGroupInfoBody(body){
-      body.innerHTML='<div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>';
-      const res=await call('groupMod',{chatId:curChatId,info:true});
+      const p = allChats.find(x=>x.id===curChatId) || {};
       body.innerHTML='';
-      const info=res||{};
       const head=document.createElement('div');head.className='gi-header';
-      const im=document.createElement('div');im.className='person-avatar';im.style.cssText='width:96px;height:96px;margin:0 auto;font-size:2.5rem';im.textContent=(info.title||curChatId)[0]?.toUpperCase()||'?';
+      const im=document.createElement('div');im.className='person-avatar';im.style.cssText='width:96px;height:96px;margin:0 auto;font-size:2.5rem';im.textContent=(p.title||curChatId)[0]?.toUpperCase()||'?';
       head.appendChild(im);
-      const h=document.createElement('h5');h.className='mt-2 mb-0';h.textContent=(info.title)||curChatId;head.appendChild(h);
-      if(info.member_count!=null){const mc=document.createElement('div');mc.className='gi-meta';mc.textContent=info.member_count+' عضو';head.appendChild(mc);}
-      if(info.description){const d=document.createElement('div');d.className='gi-desc';d.textContent=info.description;head.appendChild(d);}
+      const h=document.createElement('h5');h.className='mt-2 mb-0';h.textContent=(p.title)||curChatId;head.appendChild(h);
+      const mc=document.createElement('div');mc.className='gi-meta';mc.textContent='شناسه: '+curChatId;head.appendChild(mc);
       body.appendChild(head);
+
+      // آخرین اقدام‌های مدیریتی (اگر موجود باشد)
+      try{
+        const logRes = await call('groupMod',{chatId:curChatId,op:'log'});
+        if(logRes && Array.isArray(logRes.log) && logRes.log.length){
+          const t=document.createElement('div');t.className='gi-section-title';t.textContent='آخرین اقدام‌ها';body.appendChild(t);
+          const box=document.createElement('div');box.className='sp-card';
+          logRes.log.slice(0,10).forEach(r=>{
+            const row=document.createElement('div');row.className='sp-row';
+            const lbl=document.createElement('label');lbl.textContent=(r.action||'')+(r.targetName?' — '+r.targetName:'')+(r.targetId?' ('+r.targetId+')':'');
+            const ts=document.createElement('span');ts.className='text-secondary';ts.textContent=fmtTime(r.ts);
+            row.append(lbl,ts);box.appendChild(row);
+          });
+          body.appendChild(box);
+        }
+      }catch(e){/* لاگ اختیاری است */}
 
       const mgmtTitle=document.createElement('div');mgmtTitle.className='gi-section-title';mgmtTitle.textContent='مدیریت گروه';
       body.appendChild(mgmtTitle);
@@ -700,7 +751,7 @@
       const actions=[
         ['bi-mic-mute','سکوت کاربر',showMuteModal,'danger'],
         ['bi-ban','بن کاربر',showBanModal,'danger'],
-        ['bi-check-circle','آنben کاربر',showUnbanModal,''],
+        ['bi-check-circle','آنبن کاربر',showUnbanModal,''],
         ['bi-trash3','حذف پیام‌های اخیر',showDeleteMsgsModal,'warn'],
       ];
       actions.forEach(([icon,label,fn,cls])=>{
@@ -713,58 +764,16 @@
       body.appendChild(mgmt);
     }
 
-    function showMuteModal(){openGmodModal('سکوت کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUid" class="form-control mb-3" placeholder="12345678"><label class="mb-2 d-block">مدت (دقیقه، 0=دائمی)</label><input id="gmDur" type="number" value="0" class="form-control">`,async()=>{const uid=document.getElementById('gmUid').value.trim();const dur=parseInt(document.getElementById('gmDur').value)||0;const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'mute',minutes:dur});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'سکوت اعمال شد')})}
-    function showBanModal(){openGmodModal('بن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmBuid" class="form-control mb-3" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmBuid').value.trim();const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'ban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'بن انجام شد')})}
-    function showUnbanModal(){openGmodModal('آنben کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUbuid" class="form-control" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmUbuid').value.trim();const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'unban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'آنben انجام شد')})}
-    function showDeleteMsgsModal(){openGmodModal('حذف پیام‌های آخر',`<label class="mb-2 d-block">تعداد پیام برای حذف (حداکثر 100)</label><input id="gmDc" type="number" value="10" min="1" max="100" class="form-control">`,async()=>{const n=parseInt(document.getElementById('gmDc').value)||10;const res=await call('deleteMessages',{chatId:curChatId,msgIds:[]});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();if(res?.ok){showToast(`حذف انجام شد`,'success');fetchHistory(curChatId,false)}else showToast(res?.error||'خطا','error')})}
+    function showMuteModal(){openGmodModal('سکوت کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUid" class="form-control mb-3" placeholder="12345678"><label class="mb-2 d-block">مدت (دقیقه، 0=دائمی)</label><input id="gmDur" type="number" value="0" class="form-control">`,async()=>{const uid=document.getElementById('gmUid').value.trim();const dur=parseInt(document.getElementById('gmDur').value)||0;const res=await safeCall('groupMod',{chatId:curChatId,userId:uid,op:'mute',minutes:dur});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'سکوت اعمال شد')})}
+    function showBanModal(){openGmodModal('بن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmBuid" class="form-control mb-3" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmBuid').value.trim();const res=await safeCall('groupMod',{chatId:curChatId,userId:uid,op:'ban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'بن انجام شد')})}
+    function showUnbanModal(){openGmodModal('آنبن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUbuid" class="form-control" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmUbuid').value.trim();const res=await safeCall('groupMod',{chatId:curChatId,userId:uid,op:'unban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'آنبن انجام شد')})}
+    function showDeleteMsgsModal(){openGmodModal('حذف پیام‌های آخر',`<label class="mb-2 d-block">تعداد پیام برای حذف (حداکثر 100)</label><input id="gmDc" type="number" value="10" min="1" max="100" class="form-control">`,async()=>{const n=Math.max(1,Math.min(parseInt(document.getElementById('gmDc').value)||10,100));const ids=loadedMsgs.slice(-n).map(m=>m.msgId).filter(v=>v!=null);const res=await safeCall('deleteMessages',{chatId:curChatId,msgIds:ids});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();if(res?.ok){showToast(`حذف انجام شد (${res.deleted||0})`,'success');fetchHistory(curChatId,false)}else showToast(res?.error||'خطا','error')})}
 
     function openGmodModal(title,body,onOk){pushUiState({level:'overlay',chatId:curChatId||null});document.getElementById('gmodModalTitle').textContent=title;document.getElementById('gmodModalBody').innerHTML=body;const ok=document.getElementById('gmodModalOk');const clone=ok.cloneNode(true);ok.parentNode.replaceChild(clone,ok);clone.onclick=onOk;const modal=new bootstrap.Modal(document.getElementById('gmodModal'));modal.show()}
 
-    // ═════════════════════════════════════════════════════════════
-    //  Back-stack + chat (same as before)
-    // ═════════════════════════════════════════════════════════════
-    var isApplyingHistoryState=false;
-    function pushUiState(state){
-      if(isApplyingHistoryState) return;
-      if(history.state&&history.state.level===state.level&&history.state.chatId===state.chatId) return;
-      history.pushState(state,'','#'+state.level);
-    }
-    function backList(){
-      document.getElementById('sidebar').classList.remove('mh');
-      document.getElementById('chatBox').classList.add('d-none');
-      document.getElementById('chatBox').classList.remove('d-flex');
-      document.getElementById('noChat').classList.remove('d-none');
-      curChatId=null;
-    }
-    function applyUiState(state){
-      isApplyingHistoryState=true;
-      document.querySelectorAll('.modal.show').forEach(m=>{const inst=bootstrap.Modal.getInstance(m);if(inst)inst.hide();});
-      closeMsgContextMenu();
-      const level=state&&state.level;
-      if(level!=='settings'&&level!=='settings-sub'){document.getElementById('settingsPage').classList.remove('show');}
-      if(!level){if(curChatId)backList();}
-      else if(level==='chat'){}
-      else if(level==='profile'){new bootstrap.Modal(document.getElementById('profileModal')).show();}
-      else if(level==='ai'){new bootstrap.Modal(document.getElementById('chatSP')).show();}
-      else if(level==='settings'){document.getElementById('settingsPage').classList.add('show');showSettingsMain();}
-      else if(level==='settings-sub'){document.getElementById('settingsPage').classList.add('show');showSettingsSub(state.sub);}
-      setTimeout(()=>{isApplyingHistoryState=false;},30);
-    }
-    function goBackOneLevel(){if(history.state&&history.state.level)history.back();else backList();}
-    function handleBackButton(){goBackOneLevel();}
-    window.addEventListener('popstate',e=>applyUiState(e.state));
-    function wireModalBackStack(modalId,level){
-      document.getElementById(modalId).addEventListener('hidden.bs.modal',()=>{
-        if(!isApplyingHistoryState&&history.state&&history.state.level===level)history.back();
-      });
-    }
-
-    // wire modals
-    wireModalBackStack('profileModal','profile');
-    wireModalBackStack('chatSP','ai');
-    wireModalBackStack('newChatModal','overlay');
-    wireModalBackStack('gmodModal','overlay');
-    wireModalBackStack('mediaViewerModal','overlay');
+    // Back-stack (pushUiState / applyUiState / backList / wireModalBackStack) lives in
+    // static/js/chat.js — the definitions that used to be duplicated here are gone, so
+    // the popstate listener is registered exactly once.
 
     // composer / chat globals
     var emojiOpen=false, stickerOpen=false, curEmojiCat=0;
