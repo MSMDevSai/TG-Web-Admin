@@ -38,6 +38,10 @@ var curEmojiCat = 0;
 // M3 snackbar — replaces every alert()
 function showToast(msg, type, ms) {
   const host = document.getElementById('toastHost');
+  // Never print `true`/`[object Object]` — callers sometimes pass the raw {error} flag.
+  if (msg && typeof msg === 'object') msg = msg.message || msg.error || '';
+  if (msg === true) msg = 'خطای نامشخص';
+  if (msg === undefined || msg === null) msg = '';
   if (!host) { console.log(msg); return; }
   const t = document.createElement('div');
   t.className = 'snackbar ' + (type || 'error');

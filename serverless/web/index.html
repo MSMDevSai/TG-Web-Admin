@@ -12,10 +12,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=add,android,arrow_back,attach_file,auto_fix_high,badge,block,chat,check_circle,chevron_right,close,content_copy,delete,description,desktop_windows,devices,done,download,edit,edit_square,error,filter_list,forward,gif_box,group,image,info,install_mobile,keep,key,keyboard_arrow_down,language,logout,manage_accounts,menu,mic,mic_off,mood,movie,notifications,notifications_off,pause,pause_circle,person_add,person_remove,photo_camera,play_arrow,play_circle,reply,search,send,shortcut,smart_toy,sticky_note_2,verified_user,videocam,warning,work&display=block" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <!-- Bootstrap CSS: the markup below still uses its grid/utility classes (.container, .h-100, .d-none,
-       .d-flex, .form-control, .btn, .modal …). The M3 stylesheets are layered on top of it exactly like
-       the Hugging Face edition; without it every section renders at once and nothing is centred. -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap CSS/JS are shipped with the panel (static/vendor) so the layout
+       never depends on a CDN being reachable inside the Telegram webview.
+       The markup relies on Bootstrap's grid + utilities (.container, .h-100,
+       .d-none, .d-flex, .form-control, .btn, .modal …) exactly like the
+       Hugging Face edition; without this sheet every section renders at once. -->
+  <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
   <link href="/static/css/variables.css" rel="stylesheet">
   <link href="/static/css/icons.css" rel="stylesheet">
   <link href="/static/css/base.css" rel="stylesheet">
@@ -38,12 +40,18 @@
     <div class="auth-card text-center">
       <div class="brand-orb mx-auto mb-3"><i class="bi bi-telegram"></i></div>
       <h5 class="mb-1 fw-bold">پنل مدیریت تلگرام</h5>
+      <div id="authErr" class="auth-err d-none" role="alert"></div>
 
       <!-- login mode -->
       <div id="authLogin">
         <p class="text-secondary small mb-3">برای ورود، یوزرنیم و رمز عبور را وارد کنید.</p>
+        <div id="authTgHint" class="auth-note d-none">
+          این نسخه روی پلتفرم Serverless تلگرام اجرا می‌شود و پلتفرم فقط درخواست‌های
+          <strong>امضاشدهٔ تلگرام</strong> را می‌پذیرد؛ به همین دلیل ورود با رمز از مرورگر
+          همیشه با خطای ۴۰۱ رد می‌شود. پنل را از داخل تلگرام (دسکتاپ یا موبایل) باز کنید.
+        </div>
         <div id="authSuspended" class="auth-suspended d-none"><i class="bi bi-slash-circle"></i> این یوزر تعلیق شده است. با مدیریت تماس بگیرید.</div>
-        <input type="text" id="userInput" class="form-control mb-2 text-center" placeholder="یوزرنیم" autocomplete="username">
+        <input type="text" id="userInput" class="form-control mb-2 text-center" placeholder="یوزرنیم" autocomplete="username" onkeydown="if(event.key==='Enter')login()">
         <input type="password" id="passInput" class="form-control mb-3 text-center" placeholder="رمز عبور" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
         <button class="btn btn-primary w-100 py-2" onclick="login()">ورود</button>
         <div class="mt-2">
@@ -68,6 +76,14 @@
         <input type="password" id="resetNew2" class="form-control mb-3 text-center" placeholder="تکرار رمز جدید" onkeydown="if(event.key==='Enter')submitReset()">
         <button class="btn btn-primary w-100 py-2" onclick="submitReset()">ذخیره و ورود</button>
         <a class="auth-link" onclick="showAuthMode('login')">بازگشت به ورود</a>
+      </div>
+
+      <!-- inside Telegram but this account is not a member of the panel -->
+      <div id="authDenied" class="d-none">
+        <p class="text-secondary small mb-3">این اکانت به پنل دسترسی ندارد.</p>
+        <div class="auth-note">پنل فقط برای اعضای فهرست مجاز باز می‌شود. آیدی عددی تلگرام شما:</div>
+        <div id="deniedId" class="auth-note" dir="ltr" style="text-align:center;font-weight:700">—</div>
+        <div class="auth-note">اگر مدیر ربات هستید، این آیدی را در <code>tgcloud/lib/config.js</code> داخل <code>BOOTSTRAP_ADMINS</code> بگذارید، یک‌بار <code>tgcloud push</code> کنید و پنل را دوباره باز کنید.</div>
       </div>
     </div>
   </div>
@@ -389,7 +405,7 @@
     <!-- Toast host -->
     <div class="toast-host" id="toastHost"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/vendor/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
@@ -428,55 +444,93 @@
     }
 
     function showAuthMode(mode){
+      authError('');
       document.getElementById('authLogin').classList.toggle('d-none',mode!=='login');
       document.getElementById('authForgot').classList.toggle('d-none',mode!=='forgot');
       document.getElementById('authReset').classList.toggle('d-none',mode!=='reset');
+      document.getElementById('authDenied').classList.toggle('d-none',mode!=='denied');
+    }
+
+    // Inline error under the card header. `null`/'' clears it.
+    function authError(msg){
+      const el=document.getElementById('authErr');
+      if(!el) return;
+      const hint=document.getElementById('authTgHint');
+      if(!msg){
+        el.classList.add('d-none'); el.textContent='';
+        if(hint && !IS_TELEGRAM && !window.__WEB_BRIDGE__) hint.classList.remove('d-none');
+        return;
+      }
+      // The persistent note says the same thing — don't show both boxes at once.
+      if(hint) hint.classList.add('d-none');
+      el.textContent=String(msg);
+      el.classList.remove('d-none');
+    }
+
+    const AUTH_TG_ONLY = 'ورود از مرورگر در این نسخه ممکن نیست: پلتفرم Serverless فقط درخواست‌های امضاشدهٔ تلگرام را می‌پذیرد (خطای ۴۰۱) و اندپوینت حتی اجرا نمی‌شود. پنل را از داخل تلگرام باز کنید.';
+    function authErrText(res, fallback){
+      if(res && res.unauthorized) return AUTH_TG_ONLY;
+      const e = res && res.error;
+      return (typeof e === 'string' && e) ? e : fallback;
     }
 
     async function login(){
       const u=document.getElementById('userInput').value.trim();
       const p=document.getElementById('passInput').value;
       document.getElementById('authSuspended').classList.add('d-none');
+      authError('');
+      if(!u||!p){
+        authError('یوزرنیم و رمز عبور را وارد کنید.');
+        (u ? document.getElementById('passInput') : document.getElementById('userInput')).focus();
+        return;
+      }
       try{
         const res=await call('login',{username:u,password:p,deviceInfo:deviceInfo()});
-        if(res&&res.token){
+        if(!res){authError('اتصال به سرور برقرار نشد.');return}
+        if(res.token){
           SESSION=res.token; localStorage.setItem('TG_SESSION',SESSION);
           document.getElementById('authBox').classList.add('d-none');
           document.getElementById('app').classList.remove('d-none');
           initAppFromSession(res);
         }else{
-          showToast(res?.error||'ورود ناموفق بود','error');
+          authError(authErrText(res,'یوزرنیم یا رمز عبور اشتباه است.'));
         }
-      }catch(e){showToast(e.message||'اتصال برقرار نشد','error');}
+      }catch(e){authError((e&&e.message)||'اتصال برقرار نشد');}
     }
 
     async function requestReset(){
       const u=document.getElementById('forgotUser').value.trim();
-      if(!u){showToast('یوزرنیم را وارد کنید','warn');return}
+      authError('');
+      if(!u){authError('یوزرنیم را وارد کنید.');return}
       try{
         const res=await call('request_password_reset',{username:u});
+        if(!res){authError('اتصال به سرور برقرار نشد.');return}
+        if(res.error){authError(authErrText(res,'ارسال کد بازیابی انجام نشد.'));return}
         showToast(res?.message||'کد بازیابی ارسال شد','success',4000);
         showAuthMode('login');
-      }catch(e){showToast(e.message||'خطا','error');}
+      }catch(e){authError((e&&e.message)||'اتصال برقرار نشد');}
     }
 
     async function submitReset(){
       const code=document.getElementById('resetCode').value.trim();
       const a=document.getElementById('resetNew1').value;
       const b=document.getElementById('resetNew2').value;
-      if(a.length<6){showToast('رمز باید حداقل ۶ کاراکتر باشد','warn');return}
-      if(a!==b){showToast('تکرار رمز با رمز جدید یکی نیست','warn');return}
+      authError('');
+      if(!code){authError('کد بازیابی را وارد کنید.');return}
+      if(a.length<6){authError('رمز باید حداقل ۶ کاراکتر باشد.');return}
+      if(a!==b){authError('تکرار رمز با رمز جدید یکی نیست.');return}
       try{
         const res=await call('reset_password',{code:code,newPassword:a});
-        if(res&&res.token){
+        if(!res){authError('اتصال به سرور برقرار نشد.');return}
+        if(res.token){
           SESSION=res.token; localStorage.setItem('TG_SESSION',SESSION);
           document.getElementById('authBox').classList.add('d-none');
           document.getElementById('app').classList.remove('d-none');
           initAppFromSession(res);
         }else{
-          showToast(res?.error||'خطا در بازیابی','error');
+          authError(authErrText(res,'کد بازیابی نامعتبر است.'));
         }
-      }catch(e){showToast(e.message||'خطا','error');}
+      }catch(e){authError((e&&e.message)||'اتصال برقرار نشد');}
     }
 
     function initAppFromSession(res){
@@ -526,8 +580,22 @@
         finishSplash(false);
         startPoller();
       }catch(e){
-        showToast('خطا در راه‌اندازی: '+(e&&e.message),'error');
-        finishSplash(true);
+        const reason=(e&&(e.message||e.error))||'خطا در راه‌اندازی';
+        if(IS_TELEGRAM){
+          // Authenticated by Telegram but not a panel member: show the numeric ID so
+          // the owner can add it to BOOTSTRAP_ADMINS (this is the usual first-run case).
+          const tg = window.Telegram && window.Telegram.WebApp;
+          const uid = tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
+          document.getElementById('app').classList.add('d-none');
+          const idEl=document.getElementById('deniedId');
+          if(idEl) idEl.textContent = uid ? String(uid) : 'نامشخص';
+          document.getElementById('authBox').classList.remove('d-none');
+          showAuthMode('denied');
+          finishSplash(true);
+        } else {
+          showToast(reason,'error');
+          finishSplash(true);
+        }
       }
     }
 
@@ -561,6 +629,8 @@
       }
 
       // Show login screen
+      const hint=document.getElementById('authTgHint');
+      if(hint && !window.__WEB_BRIDGE__) hint.classList.remove('d-none');
       finishSplash(true);
       showAuthMode('login');
     };

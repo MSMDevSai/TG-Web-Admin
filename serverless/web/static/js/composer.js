@@ -272,13 +272,20 @@ async function loadStickerPanel() {
     const tile = document.createElement('div'); tile.className = 'sk-tile';
     if (it.kind === 'sticker') {
       loadMedia(it.mediaKey).then(r => {
-        const mime = r.mime || '';
+        const mime = (r && r.mime) || '';
+        if (!r || r.error || !r.url) {
+          // The file may have expired on Telegram's side — show its emoji so the
+          // tile is still recognisable (and still clickable to resend).
+          const span = document.createElement('span'); span.className = 'emo-fallback';
+          span.textContent = it.emoji || '🎭'; tile.appendChild(span); return;
+        }
         tile.innerHTML = mime === 'image/webp'
-          ? '<img src="' + r.url + '" class="m stk">'
+          ? '<img src="' + r.url + '" class="m stk" alt="">'
           : '<video class="m stk" src="' + r.url + '" autoplay loop muted playsinline></video>';
       });
     } else {
       loadMedia(it.mediaKey).then(r => {
+        if (!r || r.error || !r.url) { tile.textContent = '🎬'; return; }
         const v = document.createElement('video'); v.src = r.url;
         v.autoplay = true; v.loop = true; v.muted = true; v.playsInline = true;
         tile.appendChild(v);

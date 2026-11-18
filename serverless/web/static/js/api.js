@@ -33,18 +33,24 @@ async function fetchWeb(path, opts = {}) {
   try {
     const r = await fetch('/api/' + path, opts);
     if (r.status === 401) {
-      // initData is required by the platform — a panel session alone is not enough.
-      // Drop the stored token and hand control back to the sign-in card (no reload loop).
+      // The platform rejects every /api/* call that does not carry signed Telegram
+      // init data — the endpoint code never runs, so a browser password login can
+      // never succeed in this edition. Hand control back to the sign-in card with a
+      // message the caller can show (no reload loop).
       localStorage.removeItem('TG_SESSION');
       SESSION = '';
-      if (typeof showToast === 'function') showToast('جلسه معتبر نیست؛ لطفاً دوباره وارد شوید.', 'error');
+      const msg = (typeof window !== 'undefined' && window.__WEB_BRIDGE__)
+        ? 'نشست منقضی شده است؛ لطفاً دوباره وارد شوید.'
+        : IS_TELEGRAM
+          ? 'نشست منقضی شده است؛ لطفاً پنل را دوباره از تلگرام باز کنید.'
+          : 'ورود از مرورگر ممکن نیست: پلتفرم فقط درخواست‌های امضاشدهٔ تلگرام را می‌پذیرد (۴۰۱). پنل را از داخل تلگرام باز کنید.';
       if (!IS_TELEGRAM) {
         const app = document.getElementById('app'); if (app) app.classList.add('d-none');
         if (typeof finishSplash === 'function') finishSplash(true);
         else { const box = document.getElementById('authBox'); if (box) box.classList.remove('d-none'); }
         if (typeof showAuthMode === 'function') showAuthMode('login');
       }
-      return { error: true };
+      return { error: msg, unauthorized: true };
     }
     let j = null;
     try { j = await r.json(); } catch (e) { j = null; }

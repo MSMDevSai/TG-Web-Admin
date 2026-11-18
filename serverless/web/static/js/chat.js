@@ -481,12 +481,15 @@ function applyChatMeta(chatId, hist) {
 async function fetchHistory(chatId, silent) {
   if (!chatId) return;
   if (!silent) {
-    loadedMsgs = []; oldestLoadedId = null; hasMoreOlder = true; lastHistHash = '';
-    const hist = await callCond('messages', { chatId, limit: PAGE_SIZE });
-    if (!hist) return;
+    // Explicit loads (opening a chat, after an action) must always get fresh data —
+    // callCond() can answer "notModified" and would leave a previous render in place.
+    let hist;
+    try { hist = await call('messages', { chatId, limit: PAGE_SIZE }); }
+    catch (e) { showToast((e && e.message) || 'بارگذاری پیام‌ها نشد', 'error'); return; }
+    if (!hist || hist.error) return;
     applyChatMeta(chatId, hist);
-    loadedMsgs = hist.messages || hist;
-    if (typeof hist.hasMore === 'boolean') hasMoreOlder = hist.hasMore;
+    loadedMsgs = Array.isArray(hist.messages) ? hist.messages : [];
+    hasMoreOlder = typeof hist.hasMore === 'boolean' ? hist.hasMore : loadedMsgs.length >= PAGE_SIZE;
     oldestLoadedId = loadedMsgs.length ? loadedMsgs[0].id : null;
     lastHistHash = JSON.stringify(loadedMsgs);
     renderFullList(loadedMsgs);
@@ -499,20 +502,21 @@ async function fetchHistory(chatId, silent) {
   if (hist.error) return;
   applyChatMeta(chatId, hist);
   if (typeof hist.hasMore === 'boolean') hasMoreOlder = hist.hasMore;
-  const hs = JSON.stringify(hist.messages || hist);
+  const list = Array.isArray(hist.messages) ? hist.messages : [];
+  const hs = JSON.stringify(list);
   if (hs === lastHistHash) return;
   lastHistHash = hs;
   const wasBot = atBot();
 
   const oldIds = loadedMsgs.map(m => m.id);
-  const newIds = (hist.messages || hist).map(m => m.id);
+  const newIds = list.map(m => m.id);
   const sameLength = oldIds.length === newIds.length;
   let commonPrefix = 0;
   while (commonPrefix < oldIds.length && commonPrefix < newIds.length && oldIds[commonPrefix] === newIds[commonPrefix]) commonPrefix++;
 
   if (commonPrefix === oldIds.length && newIds.length > oldIds.length) {
-    const added = (hist.messages || hist).slice(commonPrefix);
-    loadedMsgs = hist.messages || hist;
+    const added = list.slice(commonPrefix);
+    loadedMsgs = list;
     appendRows(added);
     if (wasBot) scrollBot(true);
     else { unreadCnt += added.length; updUBadge(); document.getElementById('scrollBtn').classList.remove('d-none'); }
@@ -520,7 +524,7 @@ async function fetchHistory(chatId, silent) {
   }
   if (sameLength && commonPrefix === oldIds.length) return;
 
-  loadedMsgs = hist.messages || hist;
+  loadedMsgs = list;
   oldestLoadedId = loadedMsgs.length ? loadedMsgs[0].id : oldestLoadedId;
   renderFullList(loadedMsgs);
   if (!wasBot) {

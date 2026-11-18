@@ -1,8 +1,13 @@
 import { EndpointError } from 'sdk';
+import { requireMember } from '../lib/auth.js';
 import { listSessions, deleteSession, renameSession } from '../lib/panelAuth.js';
 
 // لیست نشست‌ها، تغییر نام یا خارج کردن یک نشست
 export default async function (input, ctx) {
+  // HTTP callers are authenticated by the platform; sessions are admin-only.
+  // (`tgcloud run` without --ctx is local/trusted and skips this.)
+  if (ctx && ctx.initData) await requireMember(ctx, true);
+
   const { op, token, name } = input || {};
   const username = input?.username;
 

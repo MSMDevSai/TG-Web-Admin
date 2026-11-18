@@ -1,12 +1,17 @@
 import { EndpointError } from 'sdk';
+import { requireMember } from '../lib/auth.js';
 import {
   listPanelUsers, createPanelUser, setSuspended, deletePanelUser,
-  setTelegramId, setBotToken,
+  setTelegramId, setBotToken, setPasswordByAdmin,
 } from '../lib/panelAuth.js';
 
 // مدیریت کاربران پنل (فقط ادمین)
 // op: list | create | suspend | unsuspend | delete | telegram-id | bot | password
 export default async function (input, ctx) {
+  // Every HTTP call carries verified Telegram initData — only panel admins may do
+  // this. Local `tgcloud run` without --ctx has no initData and is trusted (CLI).
+  if (ctx && ctx.initData) await requireMember(ctx, true);
+
   const { op, username, password, telegramId, role, suspended } = input || {};
 
   if (op === 'list') {

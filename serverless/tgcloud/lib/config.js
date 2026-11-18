@@ -5,7 +5,7 @@
 export const BOOTSTRAP_ADMINS = [111111111];
 
 // آدرس Mini App (بعد از اولین push: https://app<ID>.tgcloud.ai/ ). برای دکمه‌ی «باز کردن پنل» لازمه.
-export const WEBAPP_URL = '';
+export const WEBAPP_URL = 'https://app8813333912.tgcloud.ai/';
 
 export const DEFAULT_PROMPT = `تو خود محمد صدرا ملقب به sai:dev هستی و داری توی تلگرام شخصی خودت به پیام‌های مخاطبانت پاسخ می‌دهی.
 
