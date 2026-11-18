@@ -1,0 +1,64 @@
+/* ==========================================================================
+   Left pane — search bar, segmented view switcher, filter chips, FAB.
+   ========================================================================== */
+.sidebar{width:var(--app-column-width);flex-shrink:0;display:flex;flex-direction:column;height:100%;position:relative;z-index:10;
+    background:var(--md-sys-color-surface-container-low);border-inline-end:1px solid var(--md-sys-color-outline-variant)}
+
+.sidebar-header{height:var(--app-header-height);flex-shrink:0;display:flex;align-items:center;padding:0 12px}
+.search-bar{flex:1;display:flex;align-items:center;gap:4px;height:48px;padding:0 4px;border-radius:var(--md-sys-shape-full);
+    background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);
+    transition:background var(--md-dur-s4) var(--md-ease-standard),box-shadow var(--md-dur-s4) var(--md-ease-standard)}
+.search-bar:focus-within{background:var(--md-sys-color-surface-container-highest);box-shadow:var(--md-elev-1)}
+.search-bar input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--md-sys-color-on-surface);font:var(--md-type-body-large);padding:0 4px}
+.search-bar input::placeholder{color:var(--md-sys-color-on-surface-variant)}
+.search-bar .search-ico{font-size:1.5rem;margin-inline:4px 12px}
+
+/* connection bar (ws.js) — slides open only while not fully connected */
+.conn-status{display:flex;align-items:center;justify-content:center;gap:10px;max-height:0;overflow:hidden;opacity:0;margin:0 12px;border-radius:var(--md-sys-shape-full);
+    background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-on-surface-variant);font:var(--md-type-label-large);
+    transition:max-height var(--md-dur-m2) var(--md-ease-emph-decel),opacity var(--md-dur-s4) var(--md-ease-standard),margin var(--md-dur-m2) var(--md-ease-emph-decel)}
+.conn-status.show{max-height:36px;opacity:1;margin-block:0 8px;padding:6px 14px}
+.conn-status .spinner-border{--bs-spinner-width:14px;--bs-spinner-height:14px;--bs-spinner-border-width:2px;color:var(--md-sys-color-primary)}
+
+/* view switcher = M3 segmented button */
+.view-switcher{display:flex;padding:2px 12px 10px}
+.view-btn{position:relative;flex:1;height:40px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+    border:1px solid var(--md-sys-color-outline);color:var(--md-sys-color-on-surface);font:var(--md-type-label-large);
+    transition:background var(--md-dur-s4) var(--md-ease-standard),color var(--md-dur-s4) var(--md-ease-standard)}
+.view-btn:first-child{border-start-start-radius:var(--md-sys-shape-full);border-end-start-radius:var(--md-sys-shape-full)}
+.view-btn:last-child{border-start-end-radius:var(--md-sys-shape-full);border-end-end-radius:var(--md-sys-shape-full)}
+.view-btn+.view-btn{margin-inline-start:-1px}
+.view-btn .bi{font-size:1.125rem}
+.view-btn::before{content:"done";font-family:'Material Symbols Rounded';font-size:18px;line-height:1;width:0;opacity:0;overflow:hidden;margin-inline-end:-8px;
+    transition:width var(--md-dur-m1) var(--md-ease-emph-decel),opacity var(--md-dur-s4) var(--md-ease-standard),margin var(--md-dur-m1) var(--md-ease-emph-decel)}
+.view-btn.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+.view-btn.active::before{width:18px;opacity:1;margin-inline-end:0}
+.view-btn.active .bi{display:none}
+.vb-badge{position:absolute;top:-7px;inset-inline-end:12px;min-width:18px;height:18px;padding:0 5px;border-radius:var(--md-sys-shape-full);
+    background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);font:var(--md-type-label-small);line-height:18px;text-align:center;
+    box-shadow:0 0 0 2px var(--md-sys-color-surface-container-low);animation:md-pop-in var(--md-dur-m1) var(--md-ease-emph-decel)}
+.view-btn:not(.active) .vb-badge{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+
+/* folder tabs = M3 filter chips */
+.folder-tabs{display:flex;gap:6px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none}
+.folder-tabs::-webkit-scrollbar{display:none}
+.ftab{display:flex;align-items:center;height:32px;padding:0 10px;border-radius:var(--md-sys-shape-sm);flex-shrink:0;white-space:nowrap;cursor:pointer;
+    border:1px solid var(--md-sys-color-outline);color:var(--md-sys-color-on-surface-variant);font:var(--md-type-label-large);
+    transition:background var(--md-dur-s4) var(--md-ease-standard),color var(--md-dur-s4) var(--md-ease-standard),border-color var(--md-dur-s4) var(--md-ease-standard)}
+.ftab::before{content:"done";font-family:'Material Symbols Rounded';font-size:18px;line-height:1;width:0;opacity:0;overflow:hidden;
+    transition:width var(--md-dur-m1) var(--md-ease-emph-decel),opacity var(--md-dur-s4) var(--md-ease-standard),margin var(--md-dur-m1) var(--md-ease-emph-decel)}
+.ftab.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);border-color:transparent}
+.ftab.active::before{width:18px;opacity:1;margin-inline-end:4px}
+.ftab .cnt{margin-inline-start:5px;font:var(--md-type-label-small);opacity:.75;font-variant-numeric:tabular-nums}
+.ftab.active .cnt{opacity:1}
+
+/* compose FAB */
+.sidebar .fab{position:absolute;inset-inline-end:16px;bottom:16px;z-index:5}
+
+@media(max-width:768px){
+    .sidebar{width:100%;position:absolute;inset:0;z-index:var(--app-z-sidebar);border-inline-end:0;background:var(--md-sys-color-surface);
+        transition:transform var(--md-dur-m3) var(--md-ease-emph-decel),opacity var(--md-dur-m2) var(--md-ease-standard),visibility 0s}
+    /* hiding the list is a slide + fade (shared-axis) instead of display:none */
+    .sidebar.mh{display:flex!important;transform:translateX(var(--app-slide));opacity:0;visibility:hidden;pointer-events:none;
+        transition:transform var(--md-dur-m2) var(--md-ease-emph-accel),opacity var(--md-dur-s4) var(--md-ease-accel),visibility 0s var(--md-dur-m2)}
+}

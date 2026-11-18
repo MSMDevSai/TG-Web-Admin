@@ -192,3 +192,32 @@ export const anonBlocks = table('anon_blocks', {
   by:       text('by').default(''),
   ts:       integer('ts'),
 });
+
+// ─── کاربر پنل (ورazos با یوزرنیم/پسورد خارج از تلگرام) ───
+export const panelUsers = table('panel_users', {
+  username:   text('username').primaryKey(),
+  passwordHash: text('password_hash').notNull(),
+  salt:       text('salt').notNull(),
+  telegramId: integer('telegram_id'),
+  role:       text('role').notNull().default('user'),   // admin | user
+  suspended:  boolean('suspended').notNull().default(false),
+  createdAt:  integer('created_at'),
+}, (t) => ({ byTg: index('idx_panel_users_tg').on(t.telegramId) }));
+
+// نشست‌های وارد شده (هر دستگاه یک توکن)
+export const panelSessions = table('panel_sessions', {
+  token:      text('token').primaryKey(),
+  username:   text('username').notNull(),
+  deviceName: text('device_name').default(''),
+  platform:   text('platform').default('web'),
+  createdAt:  integer('created_at'),
+  lastSeen:   integer('last_seen'),
+}, (t) => ({ byUser: index('idx_panel_sessions_user').on(t.username) }));
+
+// توکن بازیابی یک‌بار مصرف رمز عبور
+export const panelResetTokens = table('panel_reset_tokens', {
+  token:      text('token').primaryKey(),
+  username:   text('username').notNull(),
+  expiresAt:  integer('expires_at').notNull(),
+  used:       boolean('used').notNull().default(false),
+});

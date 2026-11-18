@@ -1,0 +1,224 @@
+/* ==========================================================================
+   Base: reset, app shell, M3 interaction primitives (state layer + ripple),
+   buttons, text fields, switch / checkbox / radio, chips, badges, progress,
+   dialogs, snackbar, menus, banners.
+   ========================================================================== */
+@media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100vh;height:100dvh;overflow:hidden;margin:0;background:var(--md-sys-color-surface);color:var(--md-sys-color-on-surface);font:var(--md-type-body-large)}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,input,textarea,select{font-family:inherit}
+a{color:var(--md-sys-color-primary)}
+::selection{background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container)}
+
+/* scrollbars */
+*{scrollbar-width:thin;scrollbar-color:var(--md-sys-color-outline-variant) transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--md-sys-color-outline-variant);border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--md-sys-color-outline);background-clip:content-box;border:2px solid transparent}
+
+/* focus ring */
+:focus-visible{outline:3px solid var(--md-sys-color-secondary);outline-offset:2px;border-radius:var(--md-sys-shape-sm)}
+
+.app{display:flex;height:100vh;height:100dvh;width:100vw;overflow:hidden;position:relative;background:var(--md-sys-color-surface)}
+.chat-main{flex:1;display:flex;flex-direction:column;height:100%;min-height:0;position:relative;overflow:hidden;background:var(--md-sys-color-surface)}
+#chatBox{height:100%;min-height:0;display:flex;flex-direction:column;flex:1;overflow:hidden}
+#chatBox:not(.d-none){animation:md-fade-through var(--md-dur-m2) var(--md-ease-emph-decel)}
+#noChat{color:var(--md-sys-color-on-surface-variant)!important;font:var(--md-type-body-large)}
+#noChat .brand-orb{opacity:1!important;background:var(--md-sys-color-surface-container-high);color:var(--md-sys-color-primary);box-shadow:none}
+
+/* ---------- shared keyframes ---------- */
+@keyframes md-fade-through{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+@keyframes md-pop-in{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+@keyframes md-menu-in{from{opacity:0;transform:scale(.92,.7)}to{opacity:1;transform:none}}
+@keyframes md-slide-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes md-pulse{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes md-spin{to{transform:rotate(360deg)}}
+@keyframes md-shared-axis-in{from{opacity:0;transform:translateX(var(--app-slide))}to{opacity:1;transform:none}}
+
+/* ---------- state layer + ripple (applied to every pressable surface) ---------- */
+.icon-btn,.btn,.fab,.chatlist-chat,.view-btn,.ftab,.sp-list-row,.mcm-item,.att-menu .opt,.pa-btn,.u-btn,.tbb,.pm-tab,.pm-media-row,
+.ec,.load-older-btn,.send-btn,.scroll-btn,.voice-rec-cancel,.voice-rec-send,.react-expand,.sk-tile,.gi-member,.search-bar,
+.chat-info-container,.auth-link,.btn-close{position:relative;-webkit-user-select:none;user-select:none}
+.icon-btn::after,.btn::after,.fab::after,.chatlist-chat::after,.view-btn::after,.ftab::after,.sp-list-row::after,.mcm-item::after,
+.att-menu .opt::after,.pa-btn::after,.u-btn::after,.tbb::after,.pm-tab::after,.pm-media-row::after,.ec::after,.load-older-btn::after,
+.send-btn::after,.scroll-btn::after,.voice-rec-cancel::after,.voice-rec-send::after,.react-expand::after,.sk-tile::after,
+.gi-member::after,.chat-info-container::after,.btn-close::after{
+    content:"";position:absolute;inset:0;border-radius:inherit;background:currentColor;opacity:0;pointer-events:none;
+    transition:opacity var(--md-dur-s3) var(--md-ease-standard)
+}
+@media (hover:hover){
+    .icon-btn:hover::after,.btn:hover::after,.fab:hover::after,.chatlist-chat:hover::after,.view-btn:hover::after,.ftab:hover::after,
+    .sp-list-row:hover::after,.mcm-item:hover::after,.att-menu .opt:hover::after,.pa-btn:hover::after,.u-btn:hover::after,.tbb:hover::after,
+    .pm-tab:hover::after,.pm-media-row:hover::after,.ec:hover::after,.load-older-btn:hover::after,.send-btn:hover::after,.scroll-btn:hover::after,
+    .voice-rec-cancel:hover::after,.voice-rec-send:hover::after,.react-expand:hover::after,.sk-tile:hover::after,.gi-member:hover::after,
+    .chat-info-container:hover::after,.btn-close:hover::after{opacity:var(--md-state-hover)}
+}
+.icon-btn:focus-visible::after,.btn:focus-visible::after,.fab:focus-visible::after,.view-btn:focus-visible::after,.ftab:focus-visible::after,
+.sp-list-row:focus-visible::after,.u-btn:focus-visible::after{opacity:var(--md-state-focus)}
+.icon-btn:active::after,.btn:active::after,.fab:active::after,.chatlist-chat:active::after,.view-btn:active::after,.ftab:active::after,
+.sp-list-row:active::after,.mcm-item:active::after,.att-menu .opt:active::after,.pa-btn:active::after,.u-btn:active::after,.tbb:active::after,
+.pm-tab:active::after,.ec:active::after,.send-btn:active::after,.scroll-btn:active::after,.btn-close:active::after{opacity:var(--md-state-press)}
+
+.md-ripple-wrap{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;z-index:0}
+.md-ripple{position:absolute;border-radius:50%;background:currentColor;opacity:.14;transform:scale(0);
+    animation:md-ripple-grow 480ms var(--md-ease-standard) forwards;will-change:transform,opacity}
+.md-ripple.release{transition:opacity 320ms var(--md-ease-standard);opacity:0}
+@keyframes md-ripple-grow{to{transform:scale(1)}}
+
+/* ---------- icon button ---------- */
+.icon-btn{width:var(--app-icon-btn);height:var(--app-icon-btn);border-radius:var(--md-sys-shape-full);border:0;background:transparent;
+    color:var(--md-sys-color-on-surface-variant);display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;
+    cursor:pointer;padding:0;transition:background var(--md-dur-s3) var(--md-ease-standard),color var(--md-dur-s3) var(--md-ease-standard),transform var(--md-dur-s3) var(--md-ease-standard)}
+.icon-btn:active{transform:scale(.92)}
+.icon-btn.pri{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+.icon-btn.filled{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary)}
+.icon-btn.rec{background:var(--md-sys-color-error-container)!important;color:var(--md-sys-color-on-error-container)!important}
+
+/* ---------- FAB ---------- */
+.fab{width:56px;height:56px;border-radius:var(--md-sys-shape-lg);border:0;background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);
+    display:inline-flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;box-shadow:var(--md-elev-3);
+    transition:box-shadow var(--md-dur-s4) var(--md-ease-standard),transform var(--md-dur-s4) var(--md-ease-standard);animation:md-pop-in var(--md-dur-m2) var(--md-ease-emph-decel) .15s backwards}
+.fab:hover{box-shadow:var(--md-elev-4)}
+.fab:active{transform:scale(.94)}
+
+/* ---------- buttons (Bootstrap .btn re-skinned as M3 buttons) ---------- */
+.btn{--bs-btn-padding-x:24px;--bs-btn-padding-y:0;--bs-btn-border-width:0;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 24px;border:0;border-radius:var(--md-sys-shape-full);
+    font:var(--md-type-label-large);letter-spacing:.01em;cursor:pointer;color:var(--md-sys-color-primary);background:transparent;
+    transition:background var(--md-dur-s4) var(--md-ease-standard),box-shadow var(--md-dur-s4) var(--md-ease-standard),transform var(--md-dur-s3) var(--md-ease-standard)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary)}
+.btn-primary:hover,.btn-primary:focus,.btn-primary:active{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);box-shadow:var(--md-elev-1)}
+.btn-secondary{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+.btn-secondary:hover,.btn-secondary:focus,.btn-secondary:active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);box-shadow:var(--md-elev-1)}
+.btn-outline-secondary,.btn-outline-light{border:1px solid var(--md-sys-color-outline);color:var(--md-sys-color-primary);background:transparent;padding:0 20px}
+.btn-outline-secondary:hover,.btn-outline-secondary:focus,.btn-outline-secondary:active,.btn-outline-light:hover,.btn-outline-light:focus,.btn-outline-light:active{background:transparent;color:var(--md-sys-color-primary);border-color:var(--md-sys-color-outline)}
+.btn-outline-secondary .bi,.btn-outline-light .bi{font-size:1.25rem}
+.btn-primary.w-100,.btn-secondary.w-100{min-height:48px}
+.btn:disabled,.btn.disabled{opacity:.38;pointer-events:none;box-shadow:none}
+/* small tonal "action" button used across the settings / profile screens */
+.u-btn{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 14px;border:1px solid var(--md-sys-color-outline);border-radius:var(--md-sys-shape-sm);
+    background:transparent;color:var(--md-sys-color-on-surface-variant);font:var(--md-type-label-medium);cursor:pointer;
+    transition:background var(--md-dur-s3) var(--md-ease-standard),color var(--md-dur-s3) var(--md-ease-standard),transform var(--md-dur-s3) var(--md-ease-standard)}
+.u-btn:active{transform:scale(.96)}
+.u-btn .bi{font-size:1.1rem}
+.u-btn.primary{background:var(--md-sys-color-secondary-container);border-color:transparent;color:var(--md-sys-color-on-secondary-container)}
+.u-btn.warn{color:var(--app-amber);border-color:color-mix(in srgb,var(--app-amber) 45%,transparent)}
+.u-btn.danger{color:var(--md-sys-color-error);border-color:color-mix(in srgb,var(--md-sys-color-error) 45%,transparent)}
+
+/* ---------- text fields (filled) ---------- */
+.form-control,.sp-inp{
+    display:block;width:100%;min-height:48px;padding:12px 16px;border:0;border-radius:var(--md-sys-shape-xs) var(--md-sys-shape-xs) 0 0;
+    background-color:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface);font:var(--md-type-body-large);
+    box-shadow:inset 0 -1px 0 var(--md-sys-color-on-surface-variant);caret-color:var(--md-sys-color-primary);
+    background-image:linear-gradient(var(--md-sys-color-primary),var(--md-sys-color-primary));background-repeat:no-repeat;background-position:center bottom;background-size:0 2px;
+    transition:background-size var(--md-dur-m1) var(--md-ease-emph-decel),box-shadow var(--md-dur-s3) var(--md-ease-standard),background-color var(--md-dur-s3) var(--md-ease-standard)}
+.form-control:hover,.sp-inp:hover{box-shadow:inset 0 -1px 0 var(--md-sys-color-on-surface)}
+.form-control:focus,.sp-inp:focus{background-color:var(--md-sys-color-surface-container-highest);color:var(--md-sys-color-on-surface);outline:none;background-size:100% 2px;box-shadow:inset 0 -1px 0 transparent}
+.form-control::placeholder,.sp-inp::placeholder{color:var(--md-sys-color-on-surface-variant);opacity:.8}
+textarea.form-control{min-height:56px;resize:vertical}
+.sp-inp{width:auto;min-height:40px;padding:8px 12px;font:var(--md-type-body-medium)}
+.form-label,.bp-label{display:block;margin:0 4px 4px;font:var(--md-type-body-small);color:var(--md-sys-color-on-surface-variant)}
+
+/* ---------- switch / checkbox / radio ---------- */
+.form-check{min-height:0;padding:0;margin:0;display:flex;align-items:center;gap:12px}
+.form-check-label{font:var(--md-type-body-medium);color:var(--md-sys-color-on-surface);cursor:pointer}
+.form-check .form-check-input{float:none;margin:0}
+.form-check-input{appearance:none;-webkit-appearance:none;flex-shrink:0;cursor:pointer;border:2px solid var(--md-sys-color-outline);background:transparent;position:relative;
+    transition:background var(--md-dur-s4) var(--md-ease-standard),border-color var(--md-dur-s4) var(--md-ease-standard)}
+.form-check-input:focus{box-shadow:none;outline:none}
+.form-check-input:active{filter:none}
+.form-check-input:focus-visible{outline:3px solid var(--md-sys-color-secondary);outline-offset:2px}
+/* switch */
+.form-switch .form-check-input{width:52px;height:32px;border-radius:var(--md-sys-shape-full);background-color:var(--md-sys-color-surface-container-highest);background-image:none}
+.form-switch .form-check-input::before{content:"";position:absolute;top:50%;inset-inline-start:6px;width:16px;height:16px;border-radius:50%;background:var(--md-sys-color-outline);
+    transform:translateY(-50%);transition:inset-inline-start var(--md-dur-m1) var(--md-ease-emph-decel),width var(--md-dur-s4) var(--md-ease-standard),height var(--md-dur-s4) var(--md-ease-standard),background var(--md-dur-s4) var(--md-ease-standard)}
+.form-switch .form-check-input:active::before{width:28px;height:28px;inset-inline-start:2px}
+.form-switch .form-check-input:checked{background-color:var(--md-sys-color-primary);border-color:var(--md-sys-color-primary);background-image:none}
+.form-switch .form-check-input:checked::before{width:24px;height:24px;inset-inline-start:calc(100% - 26px - 2px);background:var(--md-sys-color-on-primary)}
+.form-switch .form-check-input:checked:active::before{width:28px;height:28px;inset-inline-start:calc(100% - 30px - 2px)}
+/* checkbox + radio */
+.form-check-input[type=checkbox]:not(:is(.form-switch *)){width:18px;height:18px;border-radius:2px}
+.form-check-input[type=checkbox]:not(:is(.form-switch *)):checked{background-color:var(--md-sys-color-primary);border-color:var(--md-sys-color-primary);
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z' fill='%23003259'/%3E%3C/svg%3E");background-size:100%}
+.form-check-input[type=radio]{width:20px;height:20px;border-radius:50%}
+.form-check-input[type=radio]:checked{border-color:var(--md-sys-color-primary);background-color:transparent;background-image:radial-gradient(var(--md-sys-color-primary) 0 45%,transparent 50%)}
+
+/* ---------- chips / badges ---------- */
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:var(--md-sys-shape-full);
+    font:var(--md-type-label-small);letter-spacing:.02em;line-height:1;color:inherit;vertical-align:baseline}
+.cmd-badge{display:inline-block;background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container);font:var(--md-type-label-small);padding:2px 10px;border-radius:var(--md-sys-shape-sm);margin-bottom:4px}
+.ai-dot{width:8px;height:8px;border-radius:50%;background:var(--md-sys-color-tertiary);animation:md-pulse 1.4s ease-in-out infinite;flex-shrink:0}
+
+/* ---------- progress ---------- */
+.spinner-border{--bs-spinner-width:2rem;--bs-spinner-height:2rem;--bs-spinner-border-width:3px;display:inline-block;width:var(--bs-spinner-width);height:var(--bs-spinner-height);
+    border:var(--bs-spinner-border-width) solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:md-spin .9s var(--md-ease-standard) infinite;vertical-align:-.125em}
+.spinner-border-sm{--bs-spinner-width:1.25rem;--bs-spinner-height:1.25rem;--bs-spinner-border-width:2.5px}
+
+/* ---------- brand mark ---------- */
+.brand-orb{width:64px;height:64px;border-radius:var(--md-sys-shape-xl);background:var(--md-sys-color-primary-container);color:var(--md-sys-color-on-primary-container);
+    display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0}
+
+/* ---------- dialogs (Bootstrap modal → M3 dialog / bottom sheet on phones) ---------- */
+.modal{--bs-modal-border-width:0}
+.modal-backdrop{--bs-backdrop-opacity:.32}
+.modal-backdrop.fade{transition:opacity var(--md-dur-m1) var(--md-ease-standard)}
+.modal-content{background:var(--md-sys-color-surface-container-high)!important;color:var(--md-sys-color-on-surface)!important;border:0!important;
+    border-radius:var(--md-sys-shape-xl)!important;box-shadow:var(--md-elev-3);overflow:hidden}
+.modal.fade .modal-dialog{transform:scale(.92) translateY(8px);opacity:0;transition:transform var(--md-dur-m2) var(--md-ease-emph-decel),opacity var(--md-dur-s4) var(--md-ease-standard)}
+.modal.show .modal-dialog{transform:none;opacity:1}
+.modal-header{padding:20px 24px 8px;border:0!important;align-items:center;gap:8px}
+.modal-title{font:var(--md-type-headline-small);font-size:1.25rem;margin:0;flex:1}
+.modal-title .bi{color:var(--md-sys-color-primary);margin-inline-end:6px;vertical-align:-.2em}
+.modal-body{padding:8px 24px 16px;color:var(--md-sys-color-on-surface-variant)}
+.modal-footer{padding:8px 24px 24px;border:0!important;gap:8px;justify-content:flex-end}
+.modal-footer .btn.w-100{margin:0}
+.modal-body .text-secondary,.modal-body label{color:var(--md-sys-color-on-surface-variant)!important}
+.btn-close{--bs-btn-close-opacity:1;width:40px;height:40px;padding:0;margin:0;border-radius:50%;background:transparent!important;opacity:1;
+    color:var(--md-sys-color-on-surface-variant);position:relative}
+.btn-close::before{content:"close";font-family:'Material Symbols Rounded';font-size:24px;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-feature-settings:'liga'}
+#mediaViewerModal .modal-content{background:transparent!important;box-shadow:none}
+#mediaViewerModal .btn-close{background:rgba(0,0,0,.45)!important;color:#fff;margin:12px!important}
+@media (max-width:600px){
+    .modal:not(#mediaViewerModal) .modal-dialog{margin:0;min-height:100%;align-items:flex-end;max-width:none}
+    .modal:not(#mediaViewerModal) .modal-content{border-radius:var(--md-sys-shape-xl) var(--md-sys-shape-xl) 0 0!important;max-height:92dvh;overflow-y:auto}
+    .modal.fade:not(#mediaViewerModal) .modal-dialog{transform:translateY(100%);opacity:1;transition:transform var(--md-dur-m3) var(--md-ease-emph-decel)}
+    .modal.show:not(#mediaViewerModal) .modal-dialog{transform:none}
+    .modal:not(#mediaViewerModal) .modal-content::before{content:"";display:block;width:32px;height:4px;border-radius:2px;background:var(--md-sys-color-on-surface-variant);opacity:.4;margin:12px auto 0}
+}
+
+/* ---------- snackbar (state.js showToast) ---------- */
+.toast-host{position:fixed;bottom:24px;inset-inline:0;margin-inline:auto;width:fit-content;z-index:var(--app-z-snackbar);display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:min(560px,92vw)}
+.snackbar{pointer-events:auto;display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 8px 6px 16px;padding-inline:16px 8px;border-radius:var(--md-sys-shape-xs);
+    background:var(--md-sys-color-inverse-surface);color:var(--md-sys-color-inverse-on-surface);box-shadow:var(--md-elev-3);font:var(--md-type-body-medium);
+    opacity:0;transform:translateY(16px);transition:opacity var(--md-dur-s4) var(--md-ease-standard),transform var(--md-dur-m1) var(--md-ease-emph-decel)}
+.snackbar.in{opacity:1;transform:none}
+.snackbar.out{opacity:0;transform:translateY(8px);transition-duration:var(--md-dur-s3)}
+.snackbar.error{background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)}
+.snackbar.warn{background:var(--app-amber-container);color:var(--app-on-amber-container)}
+.snackbar.success{background:var(--app-green-container);color:var(--app-on-green-container)}
+.sb-msg{flex:1;padding:6px 0}
+.sb-close{border:0;background:transparent;color:inherit;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.25rem;cursor:pointer;flex-shrink:0;position:relative;opacity:.9}
+.sb-close:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
+
+/* ---------- menus (shared by attach menu / message menu) ---------- */
+.m3-menu{background:var(--md-sys-color-surface-container);border-radius:var(--md-sys-shape-xs);box-shadow:var(--md-elev-2);padding:8px 0}
+
+/* ---------- banners (Bootstrap alerts) ---------- */
+.alert{border:0;border-radius:var(--md-sys-shape-md);padding:12px 16px;font:var(--md-type-body-medium)}
+.alert-warning{background:var(--app-amber-container);color:var(--app-on-amber-container)}
+.alert-danger{background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)}
+.alert code{background:rgba(255,255,255,.1);color:inherit;border-radius:4px;padding:0 4px}
+
+/* ---------- Bootstrap utility overrides so text keeps M3 roles ---------- */
+.text-secondary{color:var(--md-sys-color-on-surface-variant)!important}
+.text-white{color:var(--md-sys-color-on-surface)!important}
+.border-secondary{border-color:var(--md-sys-color-outline-variant)!important}
+.small,small{font-size:.8125rem}
+
+@media(max-width:768px){
+    .chat-main{width:100%}
+}

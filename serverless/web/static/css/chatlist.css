@@ -1,0 +1,34 @@
+/* ==========================================================================
+   Conversation list — M3 list items with state layers + selected indicator.
+   Class names are what chatlist.js already emits.
+   ========================================================================== */
+ul.chatlist{list-style:none;margin:0;padding:0 8px 96px;overflow-y:auto;flex:1}
+
+li.chatlist-chat{display:flex;align-items:center;gap:12px;min-height:72px;padding:8px 12px;border-radius:var(--md-sys-shape-lg);cursor:pointer;
+    color:var(--md-sys-color-on-surface);list-style:none;transition:background var(--md-dur-s4) var(--md-ease-standard)}
+li.chatlist-chat:hover .dialog-pin{opacity:1}
+li.chatlist-chat.active{background:var(--md-sys-color-secondary-container);color:var(--md-sys-color-on-secondary-container)}
+li.chatlist-chat.active .row-subtitle,li.chatlist-chat.active .dialog-time{color:var(--md-sys-color-on-secondary-container);opacity:.8}
+
+.dialog-avatar{width:var(--app-avatar-row);height:var(--app-avatar-row);border-radius:50%;color:rgba(255,255,255,.96);display:flex;align-items:center;justify-content:center;
+    font:600 1.2rem/1 var(--md-font);flex-shrink:0;overflow:hidden;position:relative}
+.dialog-avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+
+.dialog-subtitle-container{flex:1;min-width:0}
+.dialog-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;gap:8px}
+.row-title{display:flex;align-items:center;gap:6px;min-width:0}
+.row-title strong{font:var(--md-type-title-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px}
+.row-title .bi{font-size:1rem!important}
+.dialog-meta{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.dialog-pin{opacity:0;transition:opacity var(--md-dur-s3) var(--md-ease-standard),background var(--md-dur-s3) var(--md-ease-standard);color:var(--md-sys-color-on-surface-variant);
+    font-size:1.125rem;cursor:pointer;padding:3px;border-radius:50%}
+.dialog-pin:hover{background:color-mix(in srgb,currentColor 12%,transparent)}
+.dialog-time{font:var(--md-type-label-small);color:var(--md-sys-color-on-surface-variant)}
+
+.row-subtitle{font:var(--md-type-body-medium);color:var(--md-sys-color-on-surface-variant);overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dialog-subtitle-inner{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.row-subtitle .bi{font-size:1.125rem!important}
+
+.dialog-subtitle-badge{background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);animation:md-pop-in var(--md-dur-m1) var(--md-ease-emph-decel)}
+.dialog-subtitle-badge.muted{background:var(--md-sys-color-outline-variant);color:var(--md-sys-color-on-surface-variant)}
+li.chatlist-chat.active .dialog-subtitle-badge{background:var(--md-sys-color-on-secondary-container);color:var(--md-sys-color-secondary-container)}

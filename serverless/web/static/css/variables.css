@@ -1,0 +1,132 @@
+/* ==========================================================================
+   Material Design 3 — design tokens
+   --------------------------------------------------------------------------
+   Every colour in the app comes from a role token below (--md-sys-color-*),
+   never from a hard-coded value, so a later pass can swap the whole scheme
+   (light / dark / seed-colour personalisation) by only redefining these
+   variables. The scheme here is the dark one, generated from a blue seed
+   (#4da3ff, the same accent the panel already had).
+   ========================================================================== */
+:root{
+    color-scheme:dark;
+
+    /* ---- colour roles ---- */
+    --md-sys-color-primary:#9fcaff;
+    --md-sys-color-on-primary:#003259;
+    --md-sys-color-primary-container:#00497e;
+    --md-sys-color-on-primary-container:#d1e4ff;
+    --md-sys-color-secondary:#bcc7dc;
+    --md-sys-color-on-secondary:#263141;
+    --md-sys-color-secondary-container:#3c4858;
+    --md-sys-color-on-secondary-container:#d8e3f8;
+    --md-sys-color-tertiary:#d9bde2;
+    --md-sys-color-on-tertiary:#3c2947;
+    --md-sys-color-tertiary-container:#54405f;
+    --md-sys-color-on-tertiary-container:#f6d9ff;
+    --md-sys-color-error:#ffb4ab;
+    --md-sys-color-on-error:#690005;
+    --md-sys-color-error-container:#93000a;
+    --md-sys-color-on-error-container:#ffdad6;
+
+    --md-sys-color-surface:#10131a;
+    --md-sys-color-surface-dim:#10131a;
+    --md-sys-color-surface-bright:#363a42;
+    --md-sys-color-surface-container-lowest:#0b0e14;
+    --md-sys-color-surface-container-low:#181c24;
+    --md-sys-color-surface-container:#1c2028;
+    --md-sys-color-surface-container-high:#262b33;
+    --md-sys-color-surface-container-highest:#31363e;
+    --md-sys-color-on-surface:#e1e2e9;
+    --md-sys-color-on-surface-variant:#c3c6cf;
+    --md-sys-color-outline:#8d9199;
+    --md-sys-color-outline-variant:#43474e;
+    --md-sys-color-inverse-surface:#e1e2e9;
+    --md-sys-color-inverse-on-surface:#2e3036;
+    --md-sys-color-inverse-primary:#1a6bb2;
+    --md-sys-color-scrim:#000;
+
+    /* ---- extended (custom) colours, harmonised with the blue seed ---- */
+    --app-green:#8fd9a8;
+    --app-on-green:#003919;
+    --app-green-container:#0c4a2c;
+    --app-on-green-container:#a9f5c0;
+    --app-amber:#ffd58a;
+    --app-on-amber:#442c00;
+    --app-amber-container:#5e4100;
+    --app-on-amber-container:#ffdea8;
+
+    /* ---- shape ---- */
+    --md-sys-shape-none:0;
+    --md-sys-shape-xs:4px;
+    --md-sys-shape-sm:8px;
+    --md-sys-shape-md:12px;
+    --md-sys-shape-lg:16px;
+    --md-sys-shape-xl:28px;
+    --md-sys-shape-full:999px;
+
+    /* ---- motion ---- */
+    --md-ease-standard:cubic-bezier(.2,0,0,1);
+    --md-ease-decel:cubic-bezier(0,0,0,1);
+    --md-ease-accel:cubic-bezier(.3,0,1,1);
+    --md-ease-emph:cubic-bezier(.2,0,0,1);
+    --md-ease-emph-decel:cubic-bezier(.05,.7,.1,1);
+    --md-ease-emph-accel:cubic-bezier(.3,0,.8,.15);
+    --md-dur-s1:50ms; --md-dur-s2:100ms; --md-dur-s3:150ms; --md-dur-s4:200ms;
+    --md-dur-m1:250ms; --md-dur-m2:300ms; --md-dur-m3:350ms; --md-dur-m4:400ms;
+    --md-dur-l1:450ms; --md-dur-l2:500ms;
+
+    /* ---- state layers ---- */
+    --md-state-hover:.08;
+    --md-state-focus:.10;
+    --md-state-press:.10;
+
+    /* ---- elevation (dark scheme: soft shadow, tone does the heavy lifting) ---- */
+    --md-elev-0:none;
+    --md-elev-1:0 1px 2px rgba(0,0,0,.34),0 1px 3px 1px rgba(0,0,0,.18);
+    --md-elev-2:0 1px 2px rgba(0,0,0,.34),0 2px 6px 2px rgba(0,0,0,.18);
+    --md-elev-3:0 1px 3px rgba(0,0,0,.34),0 4px 8px 3px rgba(0,0,0,.18);
+    --md-elev-4:0 2px 3px rgba(0,0,0,.34),0 6px 10px 4px rgba(0,0,0,.18);
+    --md-elev-5:0 4px 4px rgba(0,0,0,.34),0 8px 12px 6px rgba(0,0,0,.18);
+
+    /* ---- typography (Vazirmatn carries Persian + Latin; Roboto is the Latin fallback) ---- */
+    --md-font:'Vazirmatn','Roboto',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --md-type-display-small:400 2.25rem/2.75rem var(--md-font);
+    --md-type-headline-small:500 1.5rem/2rem var(--md-font);
+    --md-type-title-large:600 1.375rem/1.75rem var(--md-font);
+    --md-type-title-medium:600 1rem/1.5rem var(--md-font);
+    --md-type-title-small:600 .875rem/1.25rem var(--md-font);
+    --md-type-body-large:400 1rem/1.5rem var(--md-font);
+    --md-type-body-medium:400 .875rem/1.25rem var(--md-font);
+    --md-type-body-small:400 .75rem/1rem var(--md-font);
+    --md-type-label-large:600 .875rem/1.25rem var(--md-font);
+    --md-type-label-medium:600 .75rem/1rem var(--md-font);
+    --md-type-label-small:600 .6875rem/1rem var(--md-font);
+
+    /* ---- layout ---- */
+    --app-column-width:360px;
+    --app-header-height:64px;
+    --app-icon-btn:40px;
+    --app-avatar-row:52px;
+    --app-input-height:48px;
+    --app-slide:30%;                 /* page slide distance, flipped for LTR below */
+    --app-z-sidebar:20;
+    --app-z-menu:80;
+    --app-z-snackbar:300;
+}
+html[dir="ltr"]{--app-slide:-30%}
+
+/* Bootstrap is still used for its modal behaviour + utilities — point its own
+   variables at the M3 roles so anything it renders inherits the scheme. */
+:root,[data-bs-theme="dark"]{
+    --bs-body-bg:var(--md-sys-color-surface);
+    --bs-body-color:var(--md-sys-color-on-surface);
+    --bs-body-font-family:var(--md-font);
+    --bs-border-color:var(--md-sys-color-outline-variant);
+    --bs-secondary-color:var(--md-sys-color-on-surface-variant);
+    --bs-emphasis-color:var(--md-sys-color-on-surface);
+    --bs-link-color:var(--md-sys-color-primary);
+    --bs-modal-bg:var(--md-sys-color-surface-container-high);
+    --bs-modal-color:var(--md-sys-color-on-surface);
+    --bs-backdrop-bg:var(--md-sys-color-scrim);
+    --bs-backdrop-opacity:.32;
+}

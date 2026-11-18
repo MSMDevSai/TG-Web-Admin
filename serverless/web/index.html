@@ -1,17 +1,793 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-bs-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>پنل</title>
+  <meta charset="UTF-8">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>پنل تلگرام</title>
+  <meta name="theme-color" content="#10131a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
-  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&icon_names=add,android,arrow_back,attach_file,auto_fix_high,badge,block,chat,check_circle,chevron_right,close,content_copy,delete,description,desktop_windows,devices,done,download,edit,edit_square,error,filter_list,forward,gif_box,group,image,info,install_mobile,keep,key,keyboard_arrow_down,language,logout,manage_accounts,menu,mic,mic_off,mood,movie,notifications,notifications_off,pause,pause_circle,person_add,person_remove,photo_camera,play_arrow,play_circle,reply,search,send,shortcut,smart_toy,sticky_note_2,verified_user,videocam,warning,work&display=block" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="/static/css/variables.css" rel="stylesheet">
+  <link href="/static/css/icons.css" rel="stylesheet">
+  <link href="/static/css/base.css" rel="stylesheet">
+  <link href="/static/css/sidebar.css" rel="stylesheet">
+  <link href="/static/css/chatlist.css" rel="stylesheet">
+  <link href="/static/css/topbar.css" rel="stylesheet">
+  <link href="/static/css/bubble.css" rel="stylesheet">
+  <link href="/static/css/composer.css" rel="stylesheet">
+  <link href="/static/css/emoji.css" rel="stylesheet">
+  <link href="/static/css/settings.css" rel="stylesheet">
 </head>
 <body>
-  <div id="app"></div>
-  <div id="toast"></div>
-  <script src="app.js"></script>
+  <!-- ==================== AUTH Screens (خارج از تلگرام) ==================== -->
+  <div id="authBox" class="container h-100 d-flex justify-content-center align-items-center">
+    <div class="auth-card text-center">
+      <div class="brand-orb mx-auto mb-3"><i class="bi bi-telegram"></i></div>
+      <h5 class="mb-1 fw-bold">پنل مدیریت تلگرام</h5>
+
+      <!-- login mode -->
+      <div id="authLogin">
+        <p class="text-secondary small mb-3">برای ورود، یوزرنیم و رمز عبور را وارد کنید.</p>
+        <div id="authSuspended" class="auth-suspended d-none"><i class="bi bi-slash-circle"></i> این یوزر تعلیق شده است. با مدیریت تماس بگیرید.</div>
+        <input type="text" id="userInput" class="form-control mb-2 text-center" placeholder="یوزرنیم" autocomplete="username">
+        <input type="password" id="passInput" class="form-control mb-3 text-center" placeholder="رمز عبور" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+        <button class="btn btn-primary w-100 py-2" onclick="login()">ورود</button>
+        <div class="mt-2">
+          <a class="auth-link" onclick="showAuthMode('forgot')">فراموشی رمز عبور</a>
+        </div>
+        <div class="mt-3 text-secondary small">یا این پنل را در تلگرام باز کنید تا به‌صورت خودکار وارد شوید.</div>
+      </div>
+
+      <!-- forgot mode -->
+      <div id="authForgot" class="d-none">
+        <p class="text-secondary small mb-3">یوزرن임을 بنویسید؛ یک کد بازیابی به تلگرامِ شما ارسال می‌شود.</p>
+        <input type="text" id="forgotUser" class="form-control mb-3 text-center" placeholder="یوزرنیم">
+        <button class="btn btn-primary w-100 py-2" onclick="requestReset()">ارسال کد بازیابی به تلگرام</button>
+        <a class="auth-link" onclick="showAuthMode('login')">بازگشت به ورود</a>
+      </div>
+
+      <!-- reset mode: after clicking code from Telegram -->
+      <div id="authReset" class="d-none">
+        <p class="text-secondary small mb-3">کد بازیابی را وارد کنید و رمز جدید انتخاب کنید (حداقل ۶ کاراکتر).</p>
+        <input type="text" id="resetCode" class="form-control mb-2 text-center" placeholder="کد بازیابی" maxlength="6">
+        <input type="password" id="resetNew1" class="form-control mb-2 text-center" placeholder="رمز جدید">
+        <input type="password" id="resetNew2" class="form-control mb-3 text-center" placeholder="تکرار رمز جدید" onkeydown="if(event.key==='Enter')submitReset()">
+        <button class="btn btn-primary w-100 py-2" onclick="submitReset()">ذخیره و ورود</button>
+        <a class="auth-link" onclick="showAuthMode('login')">بازگشت به ورود</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Main App (داخل تلگرام یا بعد از ورود) ==================== -->
+  <div id="app" class="app d-none">
+    <!-- Settings overlay -->
+    <div class="settings-page" id="settingsPage">
+      <div class="sp-view" id="spMain">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>تنظیمات</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-list-row" onclick="openSettingsSub('ai')"><i class="bi bi-robot"></i><span>هوش مصنوعی</span><small id="spAiSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row" onclick="openSettingsSub('panel')"><i class="bi bi-person-gear"></i><span>پنل و اعلان‌ها</span><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row" onclick="openSettingsSub('about')"><i class="bi bi-info-circle"></i><span>درباره</span><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row owner-only d-none" onclick="openSettingsSub('members')"><i class="bi bi-people"></i><span>مدیریت اعضا</span><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row" onclick="logout()"><i class="bi bi-box-arrow-right" style="background:var(--md-sys-color-error-container);color:var(--md-sys-color-on-error-container)"></i><span style="color:var(--md-sys-color-error)">خروج از پنل</span></div>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spAi" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>هوش مصنوعی</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-card">
+            <div class="sp-row">
+              <label for="gAiToggle">فعال‌سازی کلی AI</label>
+              <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gAiToggle"></div>
+            </div>
+            <div class="sp-row">
+              <label>مدل زبانی</label>
+              <input id="gModel" class="sp-inp" style="width:200px" placeholder="gemini-2.5-flash">
+            </div>
+            <div class="sp-row">
+              <label>تأخیر پاسخ دسته‌ای (ثانیه)</label>
+              <input id="gDelay" type="number" class="sp-inp" style="width:80px" min="5" max="120">
+            </div>
+            <div>
+              <label class="form-label">پرامپت پیش‌فرض</label>
+              <textarea id="gPrompt" class="form-control" rows="6" placeholder="دستورالعمل مادر..."></textarea>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spPanel" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>پنل و اعلان‌ها</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-card">
+            <div class="sp-row">
+              <label>نرخ بروزرسانی (میلی‌ثانیه)</label>
+              <input id="gPoll" type="number" class="sp-inp" style="width:100px" min="500">
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spMembers" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>مدیریت اعضا</h5>
+        </div>
+        <div class="sp-body">
+          <div id="membersList"></div>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spAbout" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>درباره</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-card text-center py-4">
+            <div class="brand-orb mx-auto mb-2"><i class="bi bi-telegram"></i></div>
+            <h6 class="fw-bold mb-1">پنل تلگرام</h6>
+            <div class="text-secondary" style="font-size:.82rem">پنل مدیریت ربات/بیزینس تلگرام با ظاهر Telegram Web K</div>
+          </div>
+          <div class="sp-card mt-3" id="spAboutDetails">
+            <div class="sp-row"><label>مدل زبانی فعال</label><span id="spAboutModel" class="text-secondary"></span></div>
+            <div class="sp-row"><label>وضعیت AI</label><span id="spAboutAiState" class="text-secondary"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div>
+        <div class="sidebar-header">
+          <div class="search-bar">
+            <button class="icon-btn" onclick="openSettings()" title="تنظیمات" aria-label="تنظیمات"><i class="bi bi-list"></i></button>
+            <input type="text" id="searchInput" placeholder="جستجو" oninput="filterChats()" aria-label="جستجو">
+            <i class="bi bi-search search-ico"></i>
+          </div>
+        </div>
+        <div class="view-switcher">
+          <div class="view-btn active" data-view="bot" onclick="switchView('bot')"><i class="bi bi-robot"></i> ربات <span class="vb-badge d-none" id="vbBotCount">0</span></div>
+          <div class="view-btn" data-view="biz" onclick="switchView('biz')"><i class="bi bi-telegram"></i> بیزینس <span class="vb-badge d-none" id="vbBizCount">0</span></div>
+        </div>
+        <div class="folder-tabs">
+          <div class="ftab active" data-tab="all" onclick="setTab('all')">همه <span class="cnt" id="cntAll">0</span></div>
+          <div class="ftab" data-tab="unread" onclick="setTab('unread')">خوانده‌نشده <span class="cnt" id="cntUnread">0</span></div>
+          <div class="ftab" data-tab="pinned" onclick="setTab('pinned')">پین‌شده <span class="cnt" id="cntPinned">0</span></div>
+          <div class="ftab" data-tab="groups" onclick="setTab('groups')">گروه‌ها <span class="cnt" id="cntGroups">0</span></div>
+        </div>
+      </div>
+      <ul class="chatlist" id="chatList"></ul>
+      <button class="fab" onclick="openNewChatModal()" title="چت جدید" aria-label="چت جدید"><i class="bi bi-pencil"></i></button>
+    </div>
+
+    <!-- Main chat area -->
+    <div class="chat-main" id="chatMain">
+      <div id="noChat" class="h-100 d-flex flex-column align-items-center justify-content-center text-secondary">
+        <div class="brand-orb mb-3" style="opacity:.4"><i class="bi bi-chat-square-dots"></i></div>
+        <p>یک گفتگو را برای شروع انتخاب کنید</p>
+      </div>
+
+      <div id="chatBox" class="d-none h-100 flex-column">
+        <div class="chat-topbar">
+          <div class="chat-info-container" onclick="showProfileModal()" title="پروفایل">
+            <button class="icon-btn d-md-none" onclick="event.stopPropagation();handleBackButton()"><i class="bi bi-arrow-right"></i></button>
+            <div class="person-avatar" id="hdrAv">ت</div>
+            <div class="chat-info-text">
+              <h6 class="user-title text-truncate" id="hdrTitle">مخاطب</h6>
+              <div class="chat-info-subtitle" id="hdrSub">شناسه</div>
+            </div>
+          </div>
+          <div class="chat-utils">
+            <button class="icon-btn" id="gmodToggleBtn" onclick="showProfileModal()" title="اطلاعات و مدیریت گروه" style="display:none"><i class="bi bi-shield-check"></i></button>
+          </div>
+        </div>
+
+        <div class="msgs" id="msgs"></div>
+
+        <div id="scrollBtn" class="scroll-btn d-none" onclick="scrollBot(true)">
+          <i class="bi bi-chevron-down"></i>
+          <span id="ubadge" class="ubadge d-none">0</span>
+        </div>
+
+        <!-- Emoji picker -->
+        <div class="emoji-picker" id="emojiPicker">
+          <div class="emoji-cats" id="emojiCats"></div>
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+
+        <!-- Sticker/GIF panel -->
+        <div class="emoji-picker" id="stickerPicker">
+          <div class="emoji-cats">
+            <span class="ec sk-tab active" data-tab="sticker" onclick="switchStickerTab('sticker')">🎭 استیکر</span>
+            <span class="ec sk-tab" data-tab="gif" onclick="switchStickerTab('gif')">🎬 گیف</span>
+          </div>
+          <div class="sk-grid" id="stickerGrid">
+            <div class="sk-empty" id="stickerEmpty">موردی نیست</div>
+          </div>
+        </div>
+
+        <!-- Composer -->
+        <div class="comp-wrap">
+          <div class="rstrip" id="rstrip">
+            <div class="d-flex align-items-center gap-2 flex-1" style="min-width:0">
+              <i class="bi bi-reply-fill" style="color:var(--md-sys-color-primary)"></i>
+              <span class="txt" id="rstripTxt"></span>
+            </div>
+            <i class="bi bi-x-lg" style="cursor:pointer" onclick="cancelReply()"></i>
+          </div>
+          <div class="voice-rec-panel" id="voiceRecPanel">
+            <div class="voice-rec-cancel" onclick="cancelRec()" title="لغو ضبط"><i class="bi bi-trash3"></i></div>
+            <div class="voice-rec-pill">
+              <span class="voice-rec-dot"></span>
+              <span class="voice-rec-label">در حال ضبط پیام صوتی...</span>
+              <span class="voice-rec-timer" id="voiceRecTimer">0:00</span>
+            </div>
+            <div class="voice-rec-send" onclick="stopRec(true)" title="ارسال"><i class="bi bi-send-fill" style="font-size:.85rem"></i></div>
+          </div>
+          <div class="comp-dock">
+            <div class="inp-row" id="inpRow">
+              <div style="position:relative">
+                <button class="icon-btn" id="attBtn"><i class="bi bi-paperclip"></i></button>
+                <div class="att-menu" id="attMenu">
+                  <div class="opt" onclick="pickFile('image/*','photo')"><i class="bi bi-image"></i> عکس</div>
+                  <div class="opt" onclick="pickFile('video/*','video')"><i class="bi bi-camera-video"></i> ویدیو</div>
+                  <div class="opt" onclick="pickFile('image/gif,video/mp4','animation')"><i class="bi bi-film"></i> GIF</div>
+                  <div class="opt" onclick="pickFile('*','document')"><i class="bi bi-file-earmark"></i> فایل</div>
+                </div>
+              </div>
+              <input type="file" id="fileIn" style="display:none">
+              <button class="icon-btn" id="emojiBtn" onclick="toggleEmojiPicker()"><i class="bi bi-emoji-smile"></i></button>
+              <button class="icon-btn" id="stickerBtn" onclick="toggleStickerPicker()"><i class="bi bi-stickies"></i></button>
+              <textarea id="msgIn" class="form-control" rows="1" placeholder="پیام..."></textarea>
+              <button class="icon-btn rec-btn" id="micBtn"><i class="bi bi-mic-fill"></i></button>
+              <button class="send-btn d-none" id="sendBtn" onclick="sendMsg()"><i class="bi bi-send-fill"></i></button>
+            </div>
+            <div id="senderSelector" style="display:none;padding:0 4px 4px;font-size:.78rem;color:var(--md-sys-color-on-surface-variant);display:none">
+              ارسال به‌عنوان:
+              <label style="margin-right:10px"><input type="radio" name="sender" value="bot" checked> ربات</label>
+              <label><input type="radio" name="sender" value="me"> من</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI panel -->
+    <div class="modal fade" id="chatSP" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white">
+          <div class="modal-header border-secondary">
+            <button class="icon-btn me-2" onclick="bootstrap.Modal.getInstance(document.getElementById('chatSP')).hide()"><i class="bi bi-arrow-right"></i></button>
+            <h5 class="modal-title flex-grow-1"><i class="bi bi-robot"></i> تنظیمات AI این چت</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body d-flex flex-column gap-3">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="form-check form-switch fs-6 m-0">
+                <input class="form-check-input" type="checkbox" id="csAi" onchange="updateCsStatus()">
+                <label class="form-check-label" for="csAi">فعال‌سازی AI برای این چت</label>
+              </div>
+              <small id="csStatus" class="pa-sub"></small>
+            </div>
+            <div>
+              <label class="text-secondary small d-block mb-1">پرامپت اختصاصی (خالی = پیش‌فرض)</label>
+              <textarea id="csPrompt" class="form-control" rows="10" placeholder="دستورالعمل اختصاصی..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="saveChatSettings()">ذخیره</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- New chat modal -->
+    <div class="modal fade" id="newChatModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title"><i class="bi bi-person-plus"></i> چت جدید</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <label class="form-label small text-secondary">آیدی عددی</label>
+            <input type="text" id="ncId" class="form-control mb-3" placeholder="123456789">
+            <label class="form-label small text-secondary">متن اولین پیام</label>
+            <textarea id="ncMsg" class="form-control" rows="3" placeholder="سلام..."></textarea>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button class="btn btn-primary w-100" onclick="startNewChat()">ارسال و شروع چت</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title"><i class="bi bi-card-heading"></i> پروفایل</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="profileBody">
+            <div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>
+          </div>
+          <div class="profile-actions" id="profileActions">
+            <button class="pa-btn" id="paPin" onclick="profileTogglePin()"><i class="bi bi-pin-angle"></i><span>پین گفتگو</span></button>
+            <button class="pa-btn" id="paMute" onclick="profileToggleMute()"><i class="bi bi-bell"></i><span>بی‌صدا کردن</span></button>
+            <button class="pa-btn" onclick="openChatSettingsFromProfile()"><i class="bi bi-robot"></i><span>پنل AI</span><small class="pa-sub" id="paAiStatus"></small></button>
+            <button class="pa-btn danger" onclick="deleteCurrentChat()"><i class="bi bi-trash3"></i><span>حذف گفتگو</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message context menu -->
+    <div class="msg-ctx-menu" id="msgCtxMenu">
+      <div class="mcm-react" id="mcmReact"></div>
+      <div class="mcm-items" id="mcmItems"></div>
+    </div>
+
+    <!-- Media viewer lightbox -->
+    <div class="modal fade" id="mediaViewerModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+          <button type="button" class="btn-close btn-close-white ms-auto m-2" data-bs-dismiss="modal" style="position:absolute;top:0;left:0;z-index:5"></button>
+          <div class="modal-body p-0 d-flex align-items-center justify-content-center">
+            <img id="mvImg" class="d-none" style="max-width:100%;max-height:85vh;border-radius:var(--md-sys-shape-md)">
+            <video id="mvVideo" class="d-none" controls autoplay style="max-width:100%;max-height:85vh;border-radius:var(--md-sys-shape-md)"></video>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group mod modal -->
+    <div class="modal fade" id="gmodModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content text-white">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="gmodModalTitle">عملیات گروه</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body" id="gmodModalBody"></div>
+          <div class="modal-footer border-secondary">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">لغو</button>
+            <button class="btn btn-primary" id="gmodModalOk">تأیید</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast host -->
+    <div class="toast-host" id="toastHost"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/ripple.js"></script>
+    <script src="/static/js/sidebar.js"></script>
+    <script src="/static/js/chatlist.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/composer.js"></script>
+    <script>
+    const QUICK_REACT = ["❤","👍","🔥","😁","😱","🤣"];
+    const ALL_REACT = ["❤","👍","👎","🔥","🥰","👏","😁","🤔","🤯","😱","🤬","😢","🎉","🤩","🤮","💩","🙏","👌","🕊","🤡","🥱","🥴","😍","🐳","❤‍🔥","🌚","🌭","💯","🤣","⚡","🍌","🏆","💔","🤨","😐","🍓","🍾","💋","🖕","😈","😴","😭","🤓","👻","👨‍💻","👀","🎃","🙈","😇","😨","🤝","✍","🤗","🫡","🎅","🎄","☃","💅","🤪","🗿","🆒","💘","🙉","🦄","😘","💊","🙊","😎","👾","🤷‍♂","🤷","🤷‍♀","😡"];
+
+    function applyEmojiImages(el) {
+      const IS_APPLE = /Mac|iPhone|iPod|iPad/.test(navigator.platform || navigator.userAgent || '');
+      if (IS_APPLE || !window.twemoji) return;
+      twemoji.parse(el, { folder: 'svg', ext: '.svg', attributes: () => ({ loading: 'lazy', decoding: 'async' }) });
+    }
+
+    function showToast(msg, type, ms) {
+      const host = document.getElementById('toastHost');
+      if (!host) { console.log(msg); return; }
+      const t = document.createElement('div');
+      t.className = 'snackbar ' + (type || 'error');
+      const span = document.createElement('span'); span.className = 'sb-msg'; span.textContent = msg;
+      const close = document.createElement('button'); close.className = 'sb-close'; close.innerHTML = '<i class="bi bi-x-lg"></i>';
+      t.append(span, close);
+      host.appendChild(t);
+      let done = false;
+      const dismiss = () => {
+        if (done) return; done = true;
+        t.classList.remove('in'); t.classList.add('out');
+        setTimeout(() => t.remove(), 160);
+      };
+      close.onclick = dismiss;
+      requestAnimationFrame(() => t.classList.add('in'));
+      setTimeout(dismiss, ms || 2000);
+    }
+
+    function fmtTime(ts) { return new Date(ts).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }); }
+
+    // ═════════════════════════════════════════════════════════════
+    //  Authentication — dual mode
+    // ═════════════════════════════════════════════════════════════
+    var deviceInfoCache = null;
+    function deviceInfo(){
+      if(deviceInfoCache) return deviceInfoCache;
+      const ua=navigator.userAgent;
+      const br=/Edg\//.test(ua)?'Edge':/OPR\//.test(ua)?'Opera':/SamsungBrowser/.test(ua)?'Samsung Internet':/Firefox\//.test(ua)?'Firefox':/Chrome\//.test(ua)?'Chrome':/Safari\//.test(ua)?'Safari':'مرورگر';
+      const os=/Windows/.test(ua)?'Windows':/Android/.test(ua)?'Android':/iPhone|iPad|iPod/.test(ua)?'iOS':/Mac OS X/.test(ua)?'macOS':/Linux/.test(ua)?'Linux':'';
+      const pwa=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+      deviceInfoCache={deviceName:br+(os?' · '+os:''),platform:pwa?'pwa':'web'};
+      return deviceInfoCache;
+    }
+
+    function showAuthMode(mode){
+      document.getElementById('authLogin').classList.toggle('d-none',mode!=='login');
+      document.getElementById('authForgot').classList.toggle('d-none',mode!=='forgot');
+      document.getElementById('authReset').classList.toggle('d-none',mode!=='reset');
+    }
+
+    async function login(){
+      const u=document.getElementById('userInput').value.trim();
+      const p=document.getElementById('passInput').value;
+      document.getElementById('authSuspended').classList.add('d-none');
+      try{
+        const res=await call('login',{username:u,password:p,deviceInfo:deviceInfo()});
+        if(res&&res.token){
+          SESSION=res.token; localStorage.setItem('TG_SESSION',SESSION);
+          document.getElementById('authBox').classList.add('d-none');
+          document.getElementById('app').classList.remove('d-none');
+          initAppFromSession(res);
+        }else{
+          showToast(res?.error||'ورود ناموفق بود','error');
+        }
+      }catch(e){showToast(e.message||'اتصال برقرار نشد','error');}
+    }
+
+    async function requestReset(){
+      const u=document.getElementById('forgotUser').value.trim();
+      if(!u){showToast('یوزرنیم را وارد کنید','warn');return}
+      try{
+        const res=await call('request_password_reset',{username:u});
+        showToast(res?.message||'کد بازیابی ارسال شد','success',4000);
+        showAuthMode('login');
+      }catch(e){showToast(e.message||'خطا','error');}
+    }
+
+    async function submitReset(){
+      const code=document.getElementById('resetCode').value.trim();
+      const a=document.getElementById('resetNew1').value;
+      const b=document.getElementById('resetNew2').value;
+      if(a.length<6){showToast('رمز باید حداقل ۶ کاراکتر باشد','warn');return}
+      if(a!==b){showToast('تکرار رمز با رمز جدید یکی نیست','warn');return}
+      try{
+        const res=await call('reset_password',{code:code,newPassword:a});
+        if(res&&res.token){
+          SESSION=res.token; localStorage.setItem('TG_SESSION',SESSION);
+          document.getElementById('authBox').classList.add('d-none');
+          document.getElementById('app').classList.remove('d-none');
+          initAppFromSession(res);
+        }else{
+          showToast(res?.error||'خطا در بازیابی','error');
+        }
+      }catch(e){showToast(e.message||'خطا','error');}
+    }
+
+    function initAppFromSession(res){
+      S.me = { id: res.telegramId || 0, role: res.role, name: res.username, notify: true };
+      pollMs = 3000;
+      startPoller();
+    }
+
+    async function initApp(){
+      try{
+        const r = await call('boot', {});
+        if(!r){ showToast('اتصال برقرار نشد','error'); return; }
+        S.me = r.me;
+        S.settings = r.settings || {};
+        document.getElementById('app').classList.remove('d-none');
+        document.getElementById('gAiToggle').checked = S.settings.ai_mode !== false;
+        document.getElementById('gPrompt').value = S.settings.system_prompt || '';
+        document.getElementById('gPoll').value = S.settings.poll_interval || 3000;
+        document.getElementById('gModel').value = S.settings.gemini_model || 'gemini-2.5-flash';
+        document.getElementById('gDelay').value = S.settings.ai_delay_seconds || 28;
+        pollMs = Number(S.settings.poll_interval) || 3000;
+        startPoller();
+      }catch(e){
+        showToast('خطا در راه‌اندازی: '+(e&&e.message),'error');
+      }
+    }
+
+    // Determine entry mode on load
+    window.onload=function(){
+      const tg = window.Telegram && window.Telegram.WebApp;
+      if(tg){ try{ tg.ready(); tg.expand(); if(tg.disableVerticalSwipes) tg.disableVerticalSwipes(); }catch(e){} }
+
+      // Inside Telegram: use initData → boot endpoint
+      if(IS_TELEGRAM){
+        document.getElementById('authBox').classList.add('d-none');
+        document.getElementById('app').classList.remove('d-none');
+        initApp();
+        return;
+      }
+
+      // Outside Telegram: check stored session
+      const stored = localStorage.getItem('TG_SESSION');
+      if(stored){
+        SESSION = stored;
+        try{
+          const res = await call('me',{token:SESSION});
+          if(res&&!res.error){
+            document.getElementById('authBox').classList.add('d-none');
+            document.getElementById('app').classList.remove('d-none');
+            initAppFromSession(res);
+            return;
+          }
+        }catch(e){/* session invalid → fall through to login */}
+        localStorage.removeItem('TG_SESSION'); SESSION='';
+      }
+
+      // Show login screen
+      document.getElementById('authBox').classList.remove('d-none');
+      showAuthMode('login');
+    };
+
+    // ═════════════════════════════════════════════════════════════
+    //  UI: notifications, polling, settings, profile, etc.
+    // ═════════════════════════════════════════════════════════════
+    function notify(){
+      try{const A=window.AudioContext||window.webkitAudioContext;if(!A)return;const c=new A(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(587.33,c.currentTime);o.frequency.exponentialRampToValueAtTime(880,c.currentTime+.12);g.gain.setValueAtTime(.15,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.28);o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.28)}catch(e){}
+    }
+    function atBot(){const m=document.getElementById('msgs');return(m.scrollHeight-m.scrollTop-m.clientHeight)<70}
+    function scrollBot(){const m=document.getElementById('msgs');m.scrollTop=m.scrollHeight;unreadCnt=0;updUBadge();document.getElementById('scrollBtn').classList.add('d-none')}
+    function handleScroll(){const b=document.getElementById('scrollBtn');if(atBot()){b.classList.add('d-none');unreadCnt=0;updUBadge()}else b.classList.remove('d-none');const m=document.getElementById('msgs');if(m.scrollTop<120&&hasMoreOlder&&oldestLoadedId)loadOlderMessages()}
+    function updUBadge(){const u=document.getElementById('ubadge');if(unreadCnt>0){u.innerText=unreadCnt>99?'99+':unreadCnt;u.classList.remove('d-none')}else u.classList.add('d-none')}
+    function updGlobalUnread(){let t=0;Object.values(unreadPer).forEach(v=>t+=v);document.title=t>0?`(${t}) پنل تلگرام`:'پنل تلگرام'}
+
+    const SP_SUBS=['spAi','spPanel','spMembers','spAbout'];
+    function showSettingsMain(){
+      document.getElementById('spMain').style.display='flex';
+      SP_SUBS.forEach(id=>document.getElementById(id).style.display='none');
+    }
+    function showSettingsSub(name){
+      const id='sp'+name.charAt(0).toUpperCase()+name.slice(1);
+      document.getElementById('spMain').style.display='none';
+      SP_SUBS.forEach(x=>document.getElementById(x).style.display=(x===id?'flex':'none'));
+      if(name==='about')refreshAboutPage();
+      if(name==='members')loadMembers();
+    }
+    function openSettings(){
+      pushUiState({level:'settings'});
+      document.getElementById('settingsPage').classList.add('show');
+      showSettingsMain();
+      refreshAiSummary();
+    }
+    function closeSettings(){document.getElementById('settingsPage').classList.remove('show')}
+    function openSettingsSub(name){
+      pushUiState({level:'settings-sub',sub:name});
+      showSettingsSub(name);
+    }
+    async function refreshAiSummary(){
+      const r=await call('settings',{});
+      const s = r && r.settings ? r.settings : r;
+      const el=document.getElementById('spAiSummary');
+      if(el&&s)el.textContent=s.ai_mode?'فعال':'غیرفعال';
+    }
+    async function refreshAboutPage(){
+      const r=await call('settings',{});
+      const s = r && r.settings ? r.settings : r;
+      if(!s)return;
+      document.getElementById('spAboutModel').textContent=s.gemini_model||'—';
+      document.getElementById('spAboutAiState').textContent=s.ai_mode?'فعال':'غیرفعال';
+    }
+
+    async function saveAllSettings(){
+      const v=id=>document.getElementById(id).value;
+      const body={
+        op:'save',
+        values:{
+          ai_mode:document.getElementById('gAiToggle').checked,
+          system_prompt:v('gPrompt'),
+          poll_interval:parseInt(v('gPoll'))||3000,
+          gemini_model:v('gModel').trim()||'gemini-2.5-flash',
+          ai_delay_seconds:parseFloat(v('gDelay'))||28,
+        },
+      };
+      const res=await call('settings',body);
+      if(!(res&&res.settings)){showToast(res?.error||'خطا در ذخیره','error',5000);return}
+      pollMs=body.values.poll_interval;startPoller();
+      showToast('تنظیمات ذخیره شد','success');goBackOneLevel();
+    }
+
+    async function loadMembers(){
+      const host=document.getElementById('membersList');
+      const res=await call('members',{op:'list'});
+      if(!res||res.error){host.innerHTML='<div class="pm-empty">بارگذاری نشد</div>';return}
+      host.innerHTML='';
+      (res.members||[]).forEach(m=>{
+        const card=document.createElement('div');card.className='u-card';
+        const head=document.createElement('div');head.className='u-head';
+        const name=document.createElement('span');name.className='u-name';name.textContent=m.name||String(m.tgId);
+        const badge=document.createElement('span');badge.className='u-badge '+(m.role==='admin'?'on':'off');badge.textContent=m.role==='admin'?'ادمین':'کاربر';
+        head.append(name,badge);
+        const meta=document.createElement('div');meta.className='u-meta';
+        meta.textContent='🆔 '+m.tgId+(m.notify?' — اعلان روشن':' — اعلان خاموش');
+        card.append(head,meta);host.appendChild(card);
+      });
+    }
+
+    function logout(){
+      call('logout',{token:SESSION}).finally(()=>{
+        localStorage.removeItem('TG_SESSION'); SESSION='';
+        document.getElementById('app').classList.add('d-none');
+        document.getElementById('authBox').classList.remove('d-none');
+        showAuthMode('login');
+        showToast('خروج از پنل','success');
+      });
+    }
+
+    function openNewChatModal(){pushUiState({level:'overlay',chatId:curChatId||null});new bootstrap.Modal(document.getElementById('newChatModal')).show()}
+    async function startNewChat(){
+      const id=document.getElementById('ncId').value.trim();
+      const msg=document.getElementById('ncMsg').value.trim();
+      if(!id||!msg){showToast('شناسه و پیام لازم است','warn');return}
+      const res=await call('send',{chatId:id,text:msg,mode:'bot'});
+      if(res?.success||res?.ok){bootstrap.Modal.getInstance(document.getElementById('newChatModal')).hide();document.getElementById('ncId').value='';document.getElementById('ncMsg').value='';lastChatsHash='';await fetchChats(false);selChat(res.resolvedChatId||id,'مخاطب '+id,null)}
+      else showToast(res?.error||'ارسال ناموفق','error')
+    }
+
+    async function showProfileModal(){
+      if(!curChatId)return;
+      pushUiState({level:'profile',chatId:curChatId});
+      const modal=new bootstrap.Modal(document.getElementById('profileModal'));
+      const body=document.getElementById('profileBody');
+      body.innerHTML='<div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>';
+      modal.show();
+      const c=allChats.find(x=>x.id===curChatId);
+      const pinBtn=document.getElementById('paPin'),muteBtn=document.getElementById('paMute');
+      pinBtn.querySelector('i').className='bi '+(c&&c.pinned?'bi-pin-angle-fill':'bi-pin-angle');
+      pinBtn.querySelector('span').textContent=c&&c.pinned?'لغو پین':'پین گفتگو';
+      muteBtn.querySelector('i').className='bi '+(c&&c.muted?'bi-bell-slash-fill':'bi-bell');
+      muteBtn.querySelector('span').textContent=c&&c.muted?'لغو بی‌صدا':'بی‌صدا کردن';
+      const paEl=document.getElementById('paAiStatus');
+      const on = c ? (c.aiMode !== undefined ? c.aiMode === 'on' : true) : true;
+      paEl.textContent=on?'فعال':'غیرفعال';paEl.className='pa-sub '+(on?'on':'off');
+      if(isGroup) await renderGroupInfoBody(body);
+      else await renderUserProfileBody(body);
+    }
+
+    async function renderUserProfileBody(body){
+      const res=await call('chats',{chatId:curChatId,profile:true});
+      body.innerHTML='';
+      if(!res||res.error){body.innerHTML='<div class="alert alert-warning">پروفایل در دسترس نیست</div>';return}
+      const p=res;
+      const img=document.createElement('div');img.className='text-center mb-3';
+      const im=document.createElement('div');im.className='person-avatar';im.style.cssText='width:128px;height:128px;margin:0 auto;font-size:3rem';im.textContent=(p.title||curChatId)[0]?.toUpperCase()||'?';
+      img.appendChild(im);body.appendChild(img);
+      const rows=[['شناسه',p.id||curChatId,true],['نام',p.title||''],['نوع',p.isGroup?'گروه':'خصوصی']];
+      rows.forEach(([l,v,code])=>{const d=document.createElement('p');d.innerHTML=`<strong>${l}: </strong>`+(code?`<code>${v}</code>`:v);body.appendChild(d)});
+    }
+
+    async function renderGroupInfoBody(body){
+      body.innerHTML='<div class="py-4 text-center"><div class="spinner-border" style="color:var(--md-sys-color-primary)"></div></div>';
+      const res=await call('groupMod',{chatId:curChatId,info:true});
+      body.innerHTML='';
+      const info=res||{};
+      const head=document.createElement('div');head.className='gi-header';
+      const im=document.createElement('div');im.className='person-avatar';im.style.cssText='width:96px;height:96px;margin:0 auto;font-size:2.5rem';im.textContent=(info.title||curChatId)[0]?.toUpperCase()||'?';
+      head.appendChild(im);
+      const h=document.createElement('h5');h.className='mt-2 mb-0';h.textContent=(info.title)||curChatId;head.appendChild(h);
+      if(info.member_count!=null){const mc=document.createElement('div');mc.className='gi-meta';mc.textContent=info.member_count+' عضو';head.appendChild(mc);}
+      if(info.description){const d=document.createElement('div');d.className='gi-desc';d.textContent=info.description;head.appendChild(d);}
+      body.appendChild(head);
+
+      const mgmtTitle=document.createElement('div');mgmtTitle.className='gi-section-title';mgmtTitle.textContent='مدیریت گروه';
+      body.appendChild(mgmtTitle);
+      const mgmt=document.createElement('div');mgmt.className='gi-mgmt-grid';
+      const actions=[
+        ['bi-mic-mute','سکوت کاربر',showMuteModal,'danger'],
+        ['bi-ban','بن کاربر',showBanModal,'danger'],
+        ['bi-check-circle','آنben کاربر',showUnbanModal,''],
+        ['bi-trash3','حذف پیام‌های اخیر',showDeleteMsgsModal,'warn'],
+      ];
+      actions.forEach(([icon,label,fn,cls])=>{
+        const b=document.createElement('button');b.className='pa-btn'+(cls==='danger'?' danger':'');
+        if(cls==='warn')b.style.color='var(--app-amber)';
+        b.innerHTML=`<i class="bi ${icon}"></i><span>${label}</span>`;
+        b.onclick=fn;
+        mgmt.appendChild(b);
+      });
+      body.appendChild(mgmt);
+    }
+
+    function showMuteModal(){openGmodModal('سکوت کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUid" class="form-control mb-3" placeholder="12345678"><label class="mb-2 d-block">مدت (دقیقه، 0=دائمی)</label><input id="gmDur" type="number" value="0" class="form-control">`,async()=>{const uid=document.getElementById('gmUid').value.trim();const dur=parseInt(document.getElementById('gmDur').value)||0;const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'mute',minutes:dur});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'سکوت اعمال شد')})}
+    function showBanModal(){openGmodModal('بن کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmBuid" class="form-control mb-3" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmBuid').value.trim();const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'ban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'بن انجام شد')})}
+    function showUnbanModal(){openGmodModal('آنben کاربر',`<label class="mb-2 d-block">آیدی عددی کاربر</label><input id="gmUbuid" class="form-control" placeholder="12345678">`,async()=>{const uid=document.getElementById('gmUbuid').value.trim();const res=await call('groupMod',{chatId:curChatId,userId:uid,op:'unban'});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();toastResult(res,'آنben انجام شد')})}
+    function showDeleteMsgsModal(){openGmodModal('حذف پیام‌های آخر',`<label class="mb-2 d-block">تعداد پیام برای حذف (حداکثر 100)</label><input id="gmDc" type="number" value="10" min="1" max="100" class="form-control">`,async()=>{const n=parseInt(document.getElementById('gmDc').value)||10;const res=await call('deleteMessages',{chatId:curChatId,msgIds:[]});bootstrap.Modal.getInstance(document.getElementById('gmodModal')).hide();if(res?.ok){showToast(`حذف انجام شد`,'success');fetchHistory(curChatId,false)}else showToast(res?.error||'خطا','error')})}
+
+    function openGmodModal(title,body,onOk){pushUiState({level:'overlay',chatId:curChatId||null});document.getElementById('gmodModalTitle').textContent=title;document.getElementById('gmodModalBody').innerHTML=body;const ok=document.getElementById('gmodModalOk');const clone=ok.cloneNode(true);ok.parentNode.replaceChild(clone,ok);clone.onclick=onOk;const modal=new bootstrap.Modal(document.getElementById('gmodModal'));modal.show()}
+
+    // ═════════════════════════════════════════════════════════════
+    //  Back-stack + chat (same as before)
+    // ═════════════════════════════════════════════════════════════
+    var isApplyingHistoryState=false;
+    function pushUiState(state){
+      if(isApplyingHistoryState) return;
+      if(history.state&&history.state.level===state.level&&history.state.chatId===state.chatId) return;
+      history.pushState(state,'','#'+state.level);
+    }
+    function backList(){
+      document.getElementById('sidebar').classList.remove('mh');
+      document.getElementById('chatBox').classList.add('d-none');
+      document.getElementById('chatBox').classList.remove('d-flex');
+      document.getElementById('noChat').classList.remove('d-none');
+      curChatId=null;
+    }
+    function applyUiState(state){
+      isApplyingHistoryState=true;
+      document.querySelectorAll('.modal.show').forEach(m=>{const inst=bootstrap.Modal.getInstance(m);if(inst)inst.hide();});
+      closeMsgContextMenu();
+      const level=state&&state.level;
+      if(level!=='settings'&&level!=='settings-sub'){document.getElementById('settingsPage').classList.remove('show');}
+      if(!level){if(curChatId)backList();}
+      else if(level==='chat'){}
+      else if(level==='profile'){new bootstrap.Modal(document.getElementById('profileModal')).show();}
+      else if(level==='ai'){new bootstrap.Modal(document.getElementById('chatSP')).show();}
+      else if(level==='settings'){document.getElementById('settingsPage').classList.add('show');showSettingsMain();}
+      else if(level==='settings-sub'){document.getElementById('settingsPage').classList.add('show');showSettingsSub(state.sub);}
+      setTimeout(()=>{isApplyingHistoryState=false;},30);
+    }
+    function goBackOneLevel(){if(history.state&&history.state.level)history.back();else backList();}
+    function handleBackButton(){goBackOneLevel();}
+    window.addEventListener('popstate',e=>applyUiState(e.state));
+    function wireModalBackStack(modalId,level){
+      document.getElementById(modalId).addEventListener('hidden.bs.modal',()=>{
+        if(!isApplyingHistoryState&&history.state&&history.state.level===level)history.back();
+      });
+    }
+
+    // wire modals
+    wireModalBackStack('profileModal','profile');
+    wireModalBackStack('chatSP','ai');
+    wireModalBackStack('newChatModal','overlay');
+    wireModalBackStack('gmodModal','overlay');
+    wireModalBackStack('mediaViewerModal','overlay');
+
+    // composer / chat globals
+    var emojiOpen=false, stickerOpen=false, curEmojiCat=0;
+
+    // DOM event wiring
+    const ta=document.getElementById('msgIn');
+    if(ta){ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg();}});ta.addEventListener('input',syncSendMic);}
+    const msgs=document.getElementById('msgs');
+    if(msgs)msgs.addEventListener('scroll',handleScroll);
+    const attBtn=document.getElementById('attBtn');const attMenu=document.getElementById('attMenu');
+    if(attBtn)attBtn.addEventListener('click',e=>{e.stopPropagation();attMenu.classList.toggle('show');});
+    const fileIn=document.getElementById('fileIn');
+    if(fileIn)fileIn.addEventListener('change',onFilePick);
+    const micBtn=document.getElementById('micBtn');
+    if(micBtn)micBtn.addEventListener('click',toggleRec);
+    document.addEventListener('click',e=>{
+      if(!e.target.closest('.react-bar')&&!e.target.closest('.tbb'))document.querySelectorAll('.react-bar.show').forEach(p=>p.classList.remove('show'));
+      if(!e.target.closest('#attMenu')&&!e.target.closest('#attBtn'))attMenu.classList.remove('show');
+      if(!e.target.closest('#emojiPicker')&&!e.target.closest('#emojiBtn')){emojiOpen=false;document.getElementById('emojiPicker').classList.remove('show');}
+      if(!e.target.closest('#stickerPicker')&&!e.target.closest('#stickerBtn')){stickerOpen=false;document.getElementById('stickerPicker').classList.remove('show');}
+    });
+    applyEmojiImages(document.body);
+    </script>
+  </div>
 </body>
 </html>
