@@ -4,6 +4,7 @@ import { messages } from '../schema.js';
 import { getChat, touchChat, latestMessage, addMessage, findByTg, getSettingsFor } from './store.js';
 import { sendText } from './tg.js';
 import { alertAdmins } from './notify.js';
+import { bump } from './stats.js';
 import { now, clip, faError } from './util.js';
 
 export function aiEnabled(chat, st) {
@@ -64,6 +65,7 @@ export async function runAi({ chatId, rowId, bizId }) {
   try {
     const contents = await history(chatId, st.ai_history_limit);
     if (!contents.length) { await touchChat(chatId, { aiPendingUntil: 0 }); return; }
+    try { await bump('ai_requests'); } catch (e) { /* ignore */ }
     const reply = await callGemini(st, chat.prompt || st.system_prompt, contents);
     const label = String(st.assistant_label || '').trim();
     const text = label ? `${label}\n${reply}` : reply;
@@ -74,7 +76,8 @@ export async function runAi({ chatId, rowId, bizId }) {
   } catch (e) {
     await touchChat(chatId, { aiPendingUntil: 0 });
     const msg = faError(e);
-    await alertAdmins(`خطای هوش مصنوعی در چت «${chat.title}»:\n${msg}`);
+    try { await bump('ai_errors'); } catch (e2) { /* ignore */ }
+    await alertAdmins(`خطای هوش مصنوعی در چت «${chat.title}»:\n${msg}`, { error: true });
     try { await sendText({ chatId, text: 'ببخشید، الان نتونستم جواب بدم. کمی بعد دوباره پیام بده 🙏', bizId, markdown: false }); } catch (e2) { /* ignore */ }
   }
 }

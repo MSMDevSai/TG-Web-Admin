@@ -8,6 +8,7 @@ import { sendText } from './tg.js';
 import { notifyMembers, alertAdmins } from './notify.js';
 import { aiEnabled, runAi } from './ai.js';
 import { now, sleep, clip, fullName } from './util.js';
+import { bump } from './stats.js';
 
 // صاحب اکانت بیزینس (برای تشخیص پیام‌های خودت از مخاطب)
 export async function ownerOf(bizId) {
@@ -63,7 +64,7 @@ async function handleCommand(msg, text, bizId, senderName, st) {
 }
 
 // ورودی مشترک پیام‌های دریافتی (چت بیزینس، پیام مستقیم به ربات، گروه)
-export async function ingest(msg) {
+export async function ingest(msg, opts = {}) {
   const st = await getSettings();
   const chat = msg.chat;
   const chatId = chat.id;
@@ -111,6 +112,7 @@ export async function ingest(msg) {
     replyToMsgId: rp.replyToMsgId, replyPreview: rp.replyPreview, forwardedFrom: forwardedFrom(msg),
     ts: (msg.date ? msg.date * 1000 : now()),
   });
+  if (!isOwner) { try { await bump('messages_in'); } catch (e) { /* ignore */ } }
 
   await touchChat(chatId, {
     title: (!isOwner && (chatName || senderName)) || undefined,
@@ -139,12 +141,14 @@ export async function ingest(msg) {
   // دستورها
   if (text.startsWith('/') && !info) {
     try { await handleCommand(msg, text, bizId, senderName, st); }
-    catch (e) { await alertAdmins('خطا در اجرای دستور: ' + (e && e.message)); }
+    catch (e) { await alertAdmins('خطا در اجرای دستور: ' + (e && e.message), { error: true }); }
     await notifyMembers(`💬 ${chatRow.title}\n${senderName}: ${clip(text, 300)}`, { chat: chatRow });
     return;
   }
 
   await notifyMembers(`💬 ${chatRow.title}\n${senderName}: ${clip(text, 300)}`, { chat: chatRow });
+
+  if (opts.skipAi) return;
 
   // تنظیمات AI مخصوص صاحب همین چت (کلید/مدل/پرامپت خودش، وگرنه پیش‌فرض ادمین)
   const aiSt = chatRow.ownerId ? await getSettingsFor(chatRow.ownerId) : st;

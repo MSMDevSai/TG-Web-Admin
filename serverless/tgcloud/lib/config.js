@@ -40,6 +40,9 @@ export const DEFAULTS = {
   notify_enabled: true,
   notify_deleted: true,
   admin_group_id: '',
+  filter_enabled: false,               // فیلتر خودکار کلمات ممنوعه
+  banned_words: '',                    // کلمه‌ها با خط جدید/کاما جدا می‌شوند
+  bot_username: '',
   archive_media: true,
   archive_max_mb: 20,
   archive_video_note: false,

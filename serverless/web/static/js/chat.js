@@ -364,6 +364,8 @@ function buildMsgRow(m, prevM) {
     else if (m.role === 'admin') lbl = '🖥 (پنل)';
     else if (m.role === 'model') lbl = '🤖 (هوش مصنوعی)';
     else if (m.role === 'bot_auto') lbl = '🤖 (ربات خودکار)';
+    // ادمین برای کنترل کاربران، شناسهٔ فرستنده را کنار نام می‌بیند.
+    if (S.me && S.me.role === 'admin' && m.role === 'user' && m.senderId) lbl += ` · ${m.senderId}`;
     sn.textContent = lbl; bub.appendChild(sn);
   }
   if (m.replyPreview) {

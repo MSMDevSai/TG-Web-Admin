@@ -3,6 +3,7 @@ import { recipients, getSettings } from './store.js';
 import { ownerOf } from './scope.js';
 import { WEBAPP_URL } from './config.js';
 import { clip } from './util.js';
+import { bump } from './stats.js';
 
 export function chatKeyboard(chatId, muted) {
   const row = [{ text: muted ? '🔔 باز کردن اعلان این چت' : '🔕 بستن اعلان این چت', callback_data: (muted ? 'unmute:' : 'mute:') + chatId }];
@@ -31,14 +32,32 @@ export async function notifyMembers(text, { chat, silentChat = false, plain = tr
   }
 }
 
-// خطا/هشدار فقط برای ادمین‌ها، بدون توجه به بی‌صدا بودن
-export async function alertAdmins(text) {
+// مقصدهای هشدار ادمین: پیوی همه‌ی ادمین‌ها + گروه ادمین (اگر تنظیم شده باشد).
+// برخلاف اعلان‌های عادی، این‌ها به سوییچ اعلان هر عضو کاری ندارند تا خطا/گزارش
+// هیچ‌وقت از دست ادمین نرود.
+export async function adminTargets() {
+  const ids = (await recipients()).filter((m) => m.role === 'admin').map((m) => Number(m.tgId)).filter(Boolean);
   const st = await getSettings();
-  const list = (await recipients()).filter((m) => m.role === 'admin');
-  for (const m of list) {
-    try { await api.sendMessage({ chat_id: m.tgId, text: clip('⚠️ ' + text, 3500) }); } catch (e) { /* ignore */ }
+  const group = Number(st.admin_group_id) || 0;
+  const out = [];
+  const seen = new Set();
+  for (const id of [...ids, group]) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id); out.push(id);
   }
-  if (st.admin_group_id) {
-    try { await api.sendMessage({ chat_id: Number(st.admin_group_id), text: clip('⚠️ ' + text, 3500) }); } catch (e) { /* ignore */ }
+  return out;
+}
+
+// خطا/هشدار/گزارش فقط برای ادمین‌ها؛ به گروه ادمین هم (در صورت وجود).
+// opts.error = این پیام یک خطای واقعی است و در آمار «خطای کل» ثبت شود.
+export async function alertAdmins(text, { error = false, markup = null } = {}) {
+  if (error) { try { await bump('errors_total'); } catch (e) { /* ignore */ } }
+  const body = clip('⚠️ ' + text, 3500);
+  for (const id of await adminTargets()) {
+    try {
+      const p = { chat_id: id, text: body };
+      if (markup) p.reply_markup = markup;
+      await api.sendMessage(p);
+    } catch (e) { /* ignore */ }
   }
 }

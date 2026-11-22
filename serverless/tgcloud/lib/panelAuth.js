@@ -5,7 +5,7 @@ import { panelUsers, panelSessions, panelResetTokens } from '../schema.js';
 import { now } from './util.js';
 import { EndpointError } from 'sdk';
 import { api } from 'sdk';
-import { notifyMembers } from './notify.js';
+import { notifyMembers, alertAdmins } from './notify.js';
 import { BOOTSTRAP_ADMINS } from './config.js';
 
 const SALT_LEN = 16;
@@ -164,6 +164,11 @@ export async function requestPasswordReset(username) {
   // اینجا ساده: در reset_tokens.token همان کد را می‌گذاریم (نه تو تصادفی)
   await db.update(panelResetTokens).set({ token: code }).where(and(eq(panelResetTokens.username, username), eq(panelResetTokens.used, false))).run();
 
+  // ادمین‌ها و گروه ادمین هم در جریان بازیابی رمز قرار می‌گیرند.
+  try {
+    await alertAdmins(`🔐 درخواست بازیابی رمز پنل\nیوزر: ${username}\nآیدی تلگرام: ${user.telegramId}`);
+  } catch (e) { /* ignore */ }
+
   return { message: 'کد بازیابی به تلگرام شما ارسال شد.' };
 }
 
@@ -192,6 +197,10 @@ export async function resetPassword(code, newPassword) {
     deviceName: 'بازیابی رمز', platform: 'web',
     createdAt: now(), lastSeen: now(),
   }).run();
+
+  try {
+    await alertAdmins(`✅ رمز پنل بازیابی شد\nیوزر: ${row.username}\nآیدی تلگرام: ${user.telegramId}`);
+  } catch (e) { /* ignore */ }
 
   return { token: newToken, role: user.role, is_owner: BOOTSTRAP_ADMINS.includes(user.telegramId) };
 }

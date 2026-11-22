@@ -5,11 +5,13 @@ import { memberRole } from '../lib/store.js';
 import { canSeeChat } from '../lib/scope.js';
 import { chatKeyboard } from '../lib/notify.js';
 import { anonCallback } from '../lib/anon.js';
+import { botMenuCallback } from '../lib/botMenu.js';
 
 // دکمه‌های زیر اعلان‌ها: بی‌صدا/باز کردن اعلان یک چت
 export default async function (cq) {
   const kind = String(cq.data || '').split(':')[0];
-  if (['an', 'ab', 'ar', 'ag', 'noop'].includes(kind)) { await anonCallback(cq); return; }   // دکمه‌های پیام ناشناس (برای همه، نه فقط اعضا)
+  if (kind === 'bm') { await botMenuCallback(cq); return; }
+  if (['an', 'ab', 'ar', 'ag', 'arv', 'noop'].includes(kind)) { await anonCallback(cq); return; }   // دکمه‌های پیام ناشناس (برای همه، نه فقط اعضا)
   const role = await memberRole(cq.from.id);
   if (!role) { await api.answerCallbackQuery({ callback_query_id: cq.id, text: 'دسترسی نداری.' }); return; }
   const [act, arg] = String(cq.data || '').split(':');

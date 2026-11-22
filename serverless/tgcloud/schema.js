@@ -187,6 +187,8 @@ export const anonMessages = table('anon_messages', {
   ownerId:     integer('owner_id').notNull(),
   senderId:    integer('sender_id').notNull(),
   ownerMsgId:  integer('owner_msg_id'),                // آیدی پیام در چت مالک با ربات
+  text:        text('text').default(''),               // متن پیام (فقط برای نمایش گزارش به ادمین)
+  kind:        text('kind').default(''),               // text | photo | video | voice | file | sticker | ...
   ts:          integer('ts').notNull(),
 }, (t) => ({
   byRef:   index('idx_anon_messages_ref').on(t.ref),
@@ -210,6 +212,75 @@ export const anonBlocks = table('anon_blocks', {
   senderId: integer('sender_id').notNull(),
   by:       text('by').default(''),
   ts:       integer('ts'),
+});
+
+// گزارش‌های پیام ناشناس. دلیل گزارش را مالک لینک می‌نویسد و ادمین کل گفتگو را می‌بیند.
+export const anonReports = table('anon_reports', {
+  id:         integer('id').primaryKey({ autoIncrement: true }),
+  ref:        text('ref').default(''),                 // ref پیام گزارش‌شده
+  ownerId:    integer('owner_id').notNull(),
+  senderId:   integer('sender_id').notNull(),
+  reason:     text('reason').default(''),
+  status:     text('status').notNull().default('open'), // open | resolved
+  by:         integer('by'),                            // ادمینی که رسیدگی کرد
+  ts:         integer('ts').notNull(),
+  resolvedAt: integer('resolved_at'),
+}, (t) => ({ byStatus: index('idx_anon_reports_status').on(t.status, t.ts) }));
+
+// ─── مدیریت کاربران ربات ───
+// هر کسی که به بات پیام خصوصی داده (برای انتخاب مخاطب در پنل و مدیریت)
+export const botUsers = table('bot_users', {
+  tgId:      integer('tg_id').primaryKey(),
+  name:      text('name').default(''),
+  username:  text('username').default(''),
+  lastText:  text('last_text').default(''),
+  firstSeen: integer('first_seen'),
+  lastSeen:  integer('last_seen'),
+}, (t) => ({ byLast: index('idx_bot_users_last').on(t.lastSeen) }));
+
+// بلاک سراسری کاربر در ربات. permanent=1 یعنی راه تماسی هم ندارد.
+export const userBlocks = table('user_blocks', {
+  tgId:      integer('tg_id').primaryKey(),
+  reason:    text('reason').default(''),
+  permanent: boolean('permanent').notNull().default(false),
+  by:        text('by').default(''),
+  ts:        integer('ts'),
+});
+
+// اخطارهای دستی/خودکار به کاربر (با دلیل)
+export const warnings = table('warnings', {
+  id:     integer('id').primaryKey({ autoIncrement: true }),
+  tgId:   integer('tg_id').notNull(),
+  reason: text('reason').notNull(),
+  byId:   integer('by_id'),
+  byName: text('by_name').default(''),
+  ts:     integer('ts').notNull(),
+}, (t) => ({ byUser: index('idx_warnings_user').on(t.tgId, t.ts) }));
+
+// درخواست تماس/اعتراض کاربر (دستور /contact) — ادمین در پنل می‌بیند.
+export const contactRequests = table('contact_requests', {
+  id:      integer('id').primaryKey({ autoIncrement: true }),
+  tgId:    integer('tg_id').notNull(),
+  name:    text('name').default(''),
+  text:    text('text').notNull(),
+  kind:    text('kind').default('contact'),            // contact | appeal
+  handled: boolean('handled').notNull().default(false),
+  ts:      integer('ts').notNull(),
+}, (t) => ({ byTs: index('idx_contact_requests_ts').on(t.ts) }));
+
+// وضعیت موقت گفتگو با ربات (منتظر دلیل گزارش، دلیل بلاک، متن اخطار و…)
+export const uiState = table('ui_state', {
+  tgId:  integer('tg_id').primaryKey(),
+  key:   text('key').notNull(),
+  value: text('value').default(''),
+  ts:    integer('ts'),
+});
+
+// شمارنده‌های آماری (AI، خطا، پیام و…)
+export const counters = table('counters', {
+  key:   text('key').primaryKey(),
+  value: integer('value').notNull().default(0),
+  ts:    integer('ts'),
 });
 
 // ─── کاربر پنل (ورazos با یوزرنیم/پسورد خارج از تلگرام) ───

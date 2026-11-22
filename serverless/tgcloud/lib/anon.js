@@ -1,8 +1,11 @@
 import { api, db } from 'sdk';
 import { and, eq, gt, lt, inArray } from 'sdk/db';
-import { anonLinks, anonSessions, anonMessages, anonAliases, anonBlocks } from '../schema.js';
+import { anonLinks, anonSessions, anonMessages, anonAliases, anonBlocks, anonReports } from '../schema.js';
 import { getSettings, saveSettings, adminIds, memberRole } from './store.js';
 import { describeMedia } from './media.js';
+import { alertAdmins } from './notify.js';
+import { getUiState, setUiState, clearUiState } from './moderation.js';
+import { bump } from './stats.js';
 import { now, fullName, clip, faError } from './util.js';
 
 /*
@@ -162,7 +165,10 @@ async function visitorMessage(msg, session, st) {
   await purge(st);
   const n = await aliasFor(l.ownerId, from.id);
   const ref = randToken(10);
-  await db.insert(anonMessages).values({ ref, dir: 'in', ownerId: l.ownerId, senderId: from.id, ts: now() }).run();
+  const info = describeMedia(msg);
+  const kind = info ? info.type : (msg.text ? 'text' : 'other');
+  const bodyText = clip(msg.text || msg.caption || '', 2000);
+  await db.insert(anonMessages).values({ ref, dir: 'in', ownerId: l.ownerId, senderId: from.id, text: bodyText, kind, ts: now() }).run();
   const kb = { inline_keyboard: [[{ text: '🚫 بلاک', callback_data: `ab:${ref}` }, { text: '🚩 گزارش', callback_data: `ar:${ref}` }]] };
   let sent;
   try { sent = await relayContent(msg, l.ownerId, `📩 ناشناس #${n}`, kb); }
@@ -171,6 +177,7 @@ async function visitorMessage(msg, session, st) {
     return say(chatId, '⚠️ پیام تحویل داده نشد (صاحب لینک الان در دسترس نیست).');
   }
   await db.update(anonMessages).set({ ownerMsgId: sent.message_id }).where(eq(anonMessages.ref, ref)).run();
+  try { await bump('anon_in'); } catch (e) { /* ignore */ }
   await ack(msg);
 }
 
@@ -183,8 +190,42 @@ async function ownerReply(msg, row, st) {
   } catch (e) {
     return say(msg.chat.id, e.message === 'unsupported' ? 'این نوع پیام پشتیبانی نمی‌شه.' : '⚠️ پاسخ تحویل داده نشد (فرستنده ربات رو متوقف کرده).');
   }
-  await db.insert(anonMessages).values({ ref: randToken(10), dir: 'out', ownerId: row.ownerId, senderId: row.senderId, ts: now() }).run();
+  const info = describeMedia(msg);
+  await db.insert(anonMessages).values({
+    ref: randToken(10), dir: 'out', ownerId: row.ownerId, senderId: row.senderId,
+    text: clip(msg.text || msg.caption || '', 2000), kind: info ? info.type : (msg.text ? 'text' : 'other'), ts: now(),
+  }).run();
+  try { await bump('anon_out'); } catch (e) { /* ignore */ }
   await ack(msg);
+}
+
+// ───────── ثبت دلیل گزارش و ارسال به ادمین ─────────
+async function finishReport(msg, ref) {
+  const from = msg.from || {};
+  const chatId = msg.chat.id;
+  const row = await db.select().from(anonMessages).where(and(eq(anonMessages.ref, String(ref)), eq(anonMessages.ownerId, from.id))).get();
+  if (!row) {
+    await clearUiState(from.id);
+    return say(chatId, 'این پیام دیگر در دسترس نیست.');
+  }
+  const reason = clip(String(msg.text || msg.caption || '').trim(), 1000);
+  await clearUiState(from.id);
+  if (!reason) return say(chatId, 'دلیل گزارش خالی بود. دوباره روی دکمهٔ 🚩 گزارش بزن.');
+  const ins = await db.insert(anonReports).values({
+    ref: String(ref), ownerId: row.ownerId, senderId: row.senderId, reason, status: 'open', ts: now(),
+  }).returning({ id: anonReports.id });
+  const reportId = ins && ins[0] ? ins[0].id : 0;
+  const markup = {
+    inline_keyboard: [[
+      { text: '🗂 دیدن کل گفتگو', callback_data: `arv:${reportId}` },
+      { text: '🚫 بلاک سراسری فرستنده', callback_data: `ag:${row.senderId}` },
+    ]],
+  };
+  await alertAdmins(
+    `🚩 گزارش پیام ناشناس\nمالک لینک: ${row.ownerId}\nفرستنده: ${row.senderId}\nدلیل: ${reason}`,
+    { markup },
+  );
+  return say(chatId, '🚩 گزارش با دلیل ثبت شد و برای ادمین‌ها ارسال شد.');
 }
 
 // ───────── ورودی اصلی از handler پیام‌های خصوصی؛ true یعنی مصرف شد ─────────
@@ -199,6 +240,13 @@ export async function tryHandle(msg) {
   const chatId = msg.chat.id;
 
   try {
+    // اگر مالک در حال نوشتن دلیل گزارش است، همین پیام دلیل است.
+    const draft = await getUiState(from.id);
+    if (draft && draft.key === 'anon_report' && draft.value && text && !text.startsWith('/')) {
+      await finishReport(msg, draft.value);
+      return true;
+    }
+
     if (cmd === '/start' && /^anon_[A-Za-z0-9]{8,40}$/.test(arg)) { await visitorStart(msg, arg.slice(5), st); return true; }
 
     if (cmd === '/anon') {
@@ -253,15 +301,19 @@ export async function anonCallback(cq) {
         .onConflictDoUpdate({ target: anonBlocks.key, set: { ts: now() } }).run();
       await answer('🚫 این فرستنده بلاک شد.'); return doneKb('🚫 بلاک شد');
     }
-    // گزارش: خود پیام از چت مالک برای ادمین‌ها کپی می‌شود (متن در دیتابیس ما نیست)
-    for (const id of await adminIds()) {
-      try {
-        await say(id, `🚩 گزارش پیام ناشناس\nمالک لینک: ${row.ownerId}\nفرستنده: ${row.senderId}`,
-          { reply_markup: { inline_keyboard: [[{ text: '🚫 بلاک سراسری فرستنده', callback_data: `ag:${row.senderId}` }]] } });
-        if (cq.message) await api.copyMessage({ chat_id: id, from_chat_id: cq.message.chat.id, message_id: cq.message.message_id });
-      } catch (e) { /* ignore */ }
-    }
-    await answer('🚩 گزارش برای ادمین‌ها ارسال شد.'); return doneKb('🚩 گزارش شد');
+    // گزارش: دلیل را از مالک می‌پرسیم و کل گفتگو برای ادمین قابل مشاهده می‌شود.
+    await setUiState(uid, 'anon_report', row.ref);
+    await answer('دلیل گزارش را بنویس');
+    return say(cq.message ? cq.message.chat.id : uid,
+      '🚩 دلیل گزارش را در یک پیام بنویس تا همراه با کل گفتگو برای ادمین ارسال شود.\n(برای انصراف: /stop)');
+  }
+  if (act === 'arv') {
+    if ((await memberRole(uid)) !== 'admin') return answer('فقط ادمین.');
+    const r = await db.select().from(anonReports).where(eq(anonReports.id, Number(arg))).get();
+    if (!r) return answer('گزارش پیدا نشد.');
+    await answer('');
+    const text = await conversationText(r.ownerId, r.senderId, r.reason);
+    return sendLong(cq.message ? cq.message.chat.id : uid, text);
   }
   if (act === 'ag') {
     if ((await memberRole(uid)) !== 'admin') return answer('فقط ادمین.');
@@ -272,4 +324,24 @@ export async function anonCallback(cq) {
     await answer('🚫 فرستنده در کل ربات بلاک شد.'); return doneKb('🚫 بلاک سراسری شد');
   }
   return answer('');
+}
+
+async function conversationText(ownerId, senderId, reason = '') {
+  const rows = await db.select().from(anonMessages)
+    .where(and(eq(anonMessages.ownerId, ownerId), eq(anonMessages.senderId, senderId)))
+    .orderBy(anonMessages.id).limit(200).all();
+  let body = rows.map((m) => {
+    const who = m.dir === 'in' ? '👤 ناشناس' : '🧑 مالک';
+    return `${who}: ${m.text || (m.kind ? `[${m.kind}]` : '[بدون متن]')}`;
+  }).join('\n');
+  if (!body) body = '(متن گفتگو در دسترس نیست؛ احتمالاً قبل از این نسخه ثبت شده یا طبق نگهداری پاک شده است.)';
+  return `🗂 کل گفتگوی ناشناس\nمالک: ${ownerId}\nفرستنده: ${senderId}\n` +
+    (reason ? `دلیل گزارش: ${reason}\n` : '') + '\n' + body;
+}
+
+async function sendLong(chatId, text) {
+  const body = String(text || '');
+  for (let i = 0; i < body.length; i += 3800) {
+    await say(chatId, body.slice(i, i + 3800));
+  }
 }

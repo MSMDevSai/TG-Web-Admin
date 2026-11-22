@@ -100,6 +100,7 @@
         <div class="sp-body">
           <div class="sp-list-row" onclick="openSettingsSub('ai')"><i class="bi bi-robot"></i><span>هوش مصنوعی</span><small id="spAiSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row" onclick="openSettingsSub('anon')"><i class="bi bi-eye-slash"></i><span>پیام ناشناس</span><small id="spAnonSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row owner-only d-none" onclick="openSettingsSub('admin')"><i class="bi bi-shield-lock"></i><span>مدیریت و آمار</span><small id="spAdminSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row" onclick="openSettingsSub('panel')"><i class="bi bi-person-gear"></i><span>پنل و اعلان‌ها</span><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row" onclick="openSettingsSub('about')"><i class="bi bi-info-circle"></i><span>درباره</span><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row owner-only d-none" onclick="openSettingsSub('members')"><i class="bi bi-people"></i><span>مدیریت اعضا</span><i class="bi bi-chevron-left arrow"></i></div>
@@ -214,6 +215,61 @@
             </div>
           </div>
           <button class="btn btn-primary w-100 mb-3 mt-3" onclick="savePanelPrefs()">ذخیره</button>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spAdmin" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>مدیریت و آمار</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-card">
+            <div class="sp-row"><label>📊 آمار کلی</label><button class="btn btn-sm btn-outline-secondary" onclick="loadAdminPage()">به‌روزرسانی</button></div>
+            <div id="adminStats" class="text-secondary" style="font-size:.82rem">در حال بارگذاری…</div>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label for="adminFilter">🚫 فیلتر خودکار کلمات</label>
+              <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="adminFilter"></div>
+            </div>
+            <textarea id="adminBannedWords" class="form-control" rows="4" placeholder="هر کلمه در یک خط یا با کاما جدا شود"></textarea>
+            <button class="btn btn-primary w-100 mt-2" onclick="saveAdminFilter()">ذخیرهٔ فیلتر</button>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label for="adminNotify">🔔 اعلان کلی پیام‌ها</label>
+              <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="adminNotify"></div>
+            </div>
+            <div class="sp-row"><label for="adminNotifyDel">🗑 اعلان حذف پیام</label>
+              <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="adminNotifyDel"></div>
+            </div>
+            <label class="form-label mt-2">آیدی گروه ادمین</label>
+            <input id="adminGroupId" class="form-control form-control-sm" dir="ltr" placeholder="-100…">
+            <div class="text-secondary mt-1" style="font-size:.73rem">هشدارها، خطاها، گزارش‌ها و بازیابی رمز همیشه به پیوی ادمین‌ها و این گروه می‌روند.</div>
+            <button class="btn btn-primary w-100 mt-2" onclick="saveAdminNotify()">ذخیرهٔ اعلان‌ها</button>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label>📇 مخاطبین ربات</label><small id="adminUsersCount" class="text-secondary"></small></div>
+            <input id="adminUserSearch" class="form-control form-control-sm mb-2" placeholder="جستجو با نام، یوزرنیم یا آیدی" oninput="loadAdminUsers()">
+            <div id="adminUsers"></div>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label>🚫 بلاک‌شده‌ها</label></div>
+            <div id="adminBlocks" class="text-secondary" style="font-size:.82rem">—</div>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label>🚩 گزارش‌های پیام ناشناس</label></div>
+            <div id="adminReports" class="text-secondary" style="font-size:.82rem">—</div>
+          </div>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row"><label>📨 درخواست‌های تماس</label></div>
+            <div id="adminContacts" class="text-secondary" style="font-size:.82rem">—</div>
+          </div>
         </div>
       </div>
 
@@ -401,6 +457,11 @@
           <div class="modal-body">
             <label class="form-label small text-secondary">آیدی عددی یا یوزرنیم</label>
             <input type="text" id="ncId" class="form-control mb-3" placeholder="123456789 یا @username" dir="ltr">
+            <div class="mb-3">
+              <label class="form-label small text-secondary">یا از مخاطبین ربات انتخاب کن</label>
+              <input type="text" id="ncSearch" class="form-control form-control-sm mb-2" placeholder="جستجو در مخاطبین ربات…" oninput="loadNcContacts()">
+              <div id="ncContacts" class="text-secondary" style="font-size:.82rem;max-height:180px;overflow:auto">برای دیدن مخاطبین، ادمین باش.</div>
+            </div>
             <label class="form-label small text-secondary">متن اولین پیام</label>
             <textarea id="ncMsg" class="form-control" rows="3" placeholder="سلام..."></textarea>
             <p class="text-secondary small mt-2 mb-0">ربات باید قبلاً توسط مخاطب استارت شده باشد.</p>
@@ -427,6 +488,8 @@
             <button class="pa-btn" id="paPin" onclick="profileTogglePin()"><i class="bi bi-pin-angle"></i><span>پین گفتگو</span></button>
             <button class="pa-btn" id="paMute" onclick="profileToggleMute()"><i class="bi bi-bell"></i><span>بی‌صدا کردن</span></button>
             <button class="pa-btn" onclick="openChatSettingsFromProfile()"><i class="bi bi-robot"></i><span>پنل AI</span><small class="pa-sub" id="paAiStatus"></small></button>
+            <button class="pa-btn owner-only d-none" onclick="warnCurrentUser()"><i class="bi bi-exclamation-triangle"></i><span>اخطار</span></button>
+            <button class="pa-btn danger owner-only d-none" onclick="blockCurrentUser()"><i class="bi bi-slash-circle"></i><span>بلاک کاربر</span></button>
             <button class="pa-btn danger" onclick="deleteCurrentChat()"><i class="bi bi-trash3"></i><span>حذف گفتگو</span></button>
           </div>
         </div>
@@ -720,7 +783,7 @@
     function updUBadge(){const u=document.getElementById('ubadge');if(unreadCnt>0){u.innerText=unreadCnt>99?'99+':unreadCnt;u.classList.remove('d-none')}else u.classList.add('d-none')}
     function updGlobalUnread(){let t=0;Object.values(unreadPer).forEach(v=>t+=v);document.title=t>0?`(${t}) پنل تلگرام`:'پنل تلگرام'}
 
-    const SP_SUBS=['spAi','spAnon','spPanel','spMembers','spAbout'];
+    const SP_SUBS=['spAi','spAnon','spAdmin','spPanel','spMembers','spAbout'];
     function showSettingsMain(){
       document.getElementById('spMain').style.display='flex';
       SP_SUBS.forEach(id=>document.getElementById(id).style.display='none');
@@ -731,6 +794,7 @@
       SP_SUBS.forEach(x=>document.getElementById(x).style.display=(x===id?'flex':'none'));
       if(name==='ai')loadMyAi();
       if(name==='anon')loadAnon();
+      if(name==='admin')loadAdminPage();
       if(name==='about')refreshAboutPage();
       if(name==='members')loadMembers();
     }
@@ -812,7 +876,7 @@
       });
     }
 
-    function openNewChatModal(){pushUiState({level:'overlay',chatId:curChatId||null});new bootstrap.Modal(document.getElementById('newChatModal')).show()}
+    function openNewChatModal(){pushUiState({level:'overlay',chatId:curChatId||null});new bootstrap.Modal(document.getElementById('newChatModal')).show();const s=document.getElementById('ncSearch');if(s)s.value='';loadNcContacts()}
     async function startNewChat(){
       const id=document.getElementById('ncId').value.trim();
       const msg=document.getElementById('ncMsg').value.trim();

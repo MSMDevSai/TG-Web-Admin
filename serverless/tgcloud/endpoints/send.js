@@ -6,6 +6,7 @@ import { assertCanWrite, canAccessMedia } from '../lib/scope.js';
 import { getChat, touchChat, addMessage } from '../lib/store.js';
 import { sendText } from '../lib/tg.js';
 import { now, clip, faError } from '../lib/util.js';
+import { bump } from '../lib/stats.js';
 
 // ارسال از پنل. mode: 'me' (با اکانت بیزینس، به‌جای خودت) یا 'bot' (از طرف ربات)
 //  - متن: { chatId, text }
@@ -53,6 +54,7 @@ export default async function (input, ctx) {
       replyPreview: input.replyPreview ? clip(input.replyPreview, 140) : undefined,
       senderMode: mode, byMember: me.id, ts: now() });
     await touchChat(chat.id, { lastText: text, lastSender: me.name, lastTs: now(), aiPendingUntil: 0 });
+    try { await bump('messages_out'); } catch (e) { /* ignore */ }
     return { ok: true, msgId: sent.message_id, resolvedChatId: chat.id };
   }
 
@@ -91,5 +93,6 @@ export default async function (input, ctx) {
     replyToMsgId: input.replyToMsgId ? Number(input.replyToMsgId) : undefined, replyPreview: input.replyPreview ? clip(input.replyPreview, 140) : undefined,
     senderMode: mode, byMember: me.id, ts: now() });
   await touchChat(chatId, { lastText: clip(text, 200), lastSender: me.name, lastTs: now(), aiPendingUntil: 0 });
+  try { await bump('messages_out'); } catch (e) { /* ignore */ }
   return { ok: true, msgId: sent.message_id, resolvedChatId: chatId };
 }
