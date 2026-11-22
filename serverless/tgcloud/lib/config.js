@@ -2,7 +2,7 @@
 
 // آیدی عددی ادمین‌های اصلی. همیشه ادمین‌ان و از پنل حذف/تنزل نمی‌شن
 // (تا هیچ‌وقت از پنل قفل نشی). بقیه‌ی اعضا و نقش‌هاشون داخل خود پنل مدیریت می‌شه.
-export const BOOTSTRAP_ADMINS = [111111111];
+export const BOOTSTRAP_ADMINS = [8976948302];
 
 // آدرس Mini App (بعد از اولین push: https://app<ID>.tgcloud.ai/ ). برای دکمه‌ی «باز کردن پنل» لازمه.
 export const WEBAPP_URL = 'https://app8813333912.tgcloud.ai/';
@@ -32,6 +32,8 @@ export const DEFAULTS = {
   system_prompt: DEFAULT_PROMPT,
   gemini_api_key: '',
   gemini_model: 'gemini-2.5-flash',
+  // اگر روشن باشد، اعضایی که کلید اختصاصی ندارند از کلید پیش‌فرض ادمین استفاده می‌کنند.
+  share_gemini_key: true,
   ai_delay_seconds: 28,
   ai_history_limit: 60,
   assistant_label: 'sai:dev AI Assistant:',
@@ -43,5 +45,5 @@ export const DEFAULTS = {
   archive_video_note: false,
   anon_enabled: true,                 // قابلیت پیام ناشناس (کلی)
   anon_rate_per_hour: 30,             // سقف پیام ناشناس هر فرستنده در ساعت
-  anon_retention_days: 14,            // مسیریابی پاسخ‌ها و شماره‌ها پس از این مدت پاک می‌شود
+  anon_retention_days: 120,            // مسیریابی پاسخ‌ها و شماره‌ها پس از این مدت پاک می‌شود
 };

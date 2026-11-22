@@ -22,6 +22,12 @@ export default async function (input, ctx) {
       if (isBootstrap(id)) throw new EndpointError('نقش ادمین‌های اصلی قابل تغییر نیست.');
       if (!ex) throw new EndpointError('عضو پیدا نشد.');
       await db.update(members).set({ role }).where(eq(members.tgId, id)).run();
+    } else if (op === 'notify') {
+      if (!ex) throw new EndpointError('عضو پیدا نشد.');
+      await db.update(members).set({ notify: !!input.notify }).where(eq(members.tgId, id)).run();
+    } else if (op === 'name') {
+      if (!ex) throw new EndpointError('عضو پیدا نشد.');
+      await db.update(members).set({ name: String(input.name || '').slice(0, 60) }).where(eq(members.tgId, id)).run();
     } else if (op === 'remove') {
       if (isBootstrap(id)) throw new EndpointError('ادمین‌های اصلی قابل حذف نیستند.');
       if (id === me.id) throw new EndpointError('نمی‌تونی خودت رو حذف کنی.');

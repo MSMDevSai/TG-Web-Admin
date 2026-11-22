@@ -1,7 +1,8 @@
 import { db, api } from 'sdk';
 import { eq } from 'sdk/db';
 import { connections } from '../schema.js';
-import { getSettings, getChat, touchChat, addMessage, findByTg, saveConnection } from './store.js';
+import { getSettings, getSettingsFor, getChat, touchChat, addMessage, findByTg, saveConnection, memberRole } from './store.js';
+import { claimChat } from './scope.js';
 import { describeMedia, archiveMedia } from './media.js';
 import { sendText } from './tg.js';
 import { notifyMembers, alertAdmins } from './notify.js';
@@ -83,6 +84,23 @@ export async function ingest(msg) {
   if (!text && info) text = info.ph;
   if (!text && !info) return;
 
+  // فیلتر محتوای گروه: انواع مسدودشده پیش از ذخیره در تلگرام حذف می‌شوند.
+  // اگر حذف موفق باشد هیچ رکوردی ذخیره نمی‌شود؛ وگرنه پیام عادی ثبت می‌شود.
+  if (isGroup) {
+    const raw = st['group_filter_' + chatId];
+    const f = raw && typeof raw === 'object' ? raw : null;
+    if (f) {
+      const kindMap = { sticker: 'sticker', animation: 'gif', voice: 'voice', video: 'video', photo: 'photo', document: 'file', audio: 'song' };
+      const blockedType = !!(info && f[kindMap[info.type]]);
+      const blockedLink = !!(!info && f.link && /(https?:\/\/|www\.|t\.me\/)/i.test(text));
+      if (blockedType || blockedLink) {
+        let removed = false;
+        try { await api.deleteMessage({ chat_id: chatId, message_id: msg.message_id }); removed = true; } catch (e) { /* ربات ادمین نیست */ }
+        if (removed) return; // چیزی ذخیره نمی‌شود: پیام در تلگرام حذف شده است.
+      }
+    }
+  }
+
   if (info) await archiveMedia(info, st);
 
   const rp = replyInfo(msg);
@@ -102,9 +120,21 @@ export async function ingest(msg) {
     lastText: clip(text, 200), lastSender: isOwner ? 'شما' : senderName, lastTs: now(),
   });
 
-  if (isOwner) return;                       // پیام خودت: نه اعلان، نه AI
+  // ─── صاحب چت (جداسازی پنل اعضا) ───
+  // چت خصوصی: خودِ طرف · بیزینس: صاحب اتصال · گروه: اولین عضو پنل که پیام می‌فرستد
+  // (اگر هیچ‌کدام، handlers/my_chat_member هنگام افزودن ربات ثبتش می‌کند).
+  let chatRow = await getChat(chatId);
+  if (chatRow && !chatRow.ownerId) {
+    if (isGroup) {
+      if (from.id && await memberRole(from.id)) await claimChat(chatRow, from.id, senderName);
+    } else if (bizId) {
+      if (ownerId) await claimChat(chatRow, ownerId, '');
+    } else {
+      await claimChat(chatRow, chatId, chatName || senderName);
+    }
+  }
 
-  const chatRow = await getChat(chatId);
+  if (isOwner) return;                       // پیام خودت: نه اعلان، نه AI
 
   // دستورها
   if (text.startsWith('/') && !info) {
@@ -116,12 +146,14 @@ export async function ingest(msg) {
 
   await notifyMembers(`💬 ${chatRow.title}\n${senderName}: ${clip(text, 300)}`, { chat: chatRow });
 
-  if (!aiEnabled(chatRow, st)) return;
+  // تنظیمات AI مخصوص صاحب همین چت (کلید/مدل/پرامپت خودش، وگرنه پیش‌فرض ادمین)
+  const aiSt = chatRow.ownerId ? await getSettingsFor(chatRow.ownerId) : st;
+  if (!aiEnabled(chatRow, aiSt)) return;
 
   const myRow = await findByTg(chatId, msg.message_id);
   if (!myRow) return;
-  const delay = Math.max(1, Number(st.ai_delay_seconds) || 28);
+  const delay = Math.max(1, Number(aiSt.ai_delay_seconds) || 28);
   await touchChat(chatId, { aiPendingUntil: now() + delay * 1000 + 8000 });
   await sleep(delay * 1000);                 // ← بخش «تایمر ۲۸ ثانیه‌ای»
-  await runAi({ chatId, rowId: myRow.id, bizId, st: await getSettings() });
+  await runAi({ chatId, rowId: myRow.id, bizId });
 }

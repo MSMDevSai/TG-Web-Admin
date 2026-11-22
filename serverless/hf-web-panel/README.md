@@ -3,8 +3,8 @@ title: Telegram Serverless Web Panel
 emoji: 🌐
 colorFrom: indigo
 colorTo: blue
-sdk: docker
-app_port: 7860
+sdk: gradio
+app_file: app.py
 pinned: false
 ---
 
@@ -12,6 +12,10 @@ pinned: false
 
 این یک **پل (bridge)** کوچک است: پنل و داده‌ها روی سرورلس تلگرام می‌مانند و این
 سرویس فقط اجازه می‌دهد همان پنل را از **مرورگر / هاگینگ‌فیس** هم باز کنی.
+
+این Space از نوع **Gradio SDK** است (بدون Docker؛ پلن رایگان هم کافی است).
+Gradio فقط یک صفحهٔ ورود/وضعیت در مسیر `/gradio` نشان می‌دهد؛ خودِ پنل در مسیر
+ریشه `/` سرو می‌شود.
 
 ## چرا لازم است؟
 
@@ -61,9 +65,18 @@ pinned: false
 
 ### ۲) سمت هاگینگ‌فیس
 
-1. یک **Docker Space** بساز (پیشنهاد: **Private**).
+1. یک **Space** با SDK = **Gradio** بساز («Private» بهتر است؛ اگر پلن رایگان اجازه نداد، Public هم با رمز پنل قابل استفاده است). پلن رایگان برای SDK گریدو کافی است.
 2. محتویات همین پوشه (`hf-web-panel/`) را در Space بگذار — یا با git push، یا با
-   آپلود فایل‌ها در بخش Files.
+   آپلود فایل‌ها در بخش Files. حداقل این‌ها لازم‌اند:
+   `app.py`، `requirements.txt` و فایل frontmatter همین README.
+   برای آپلود یک‌مرحله‌ای:
+
+   ```bash
+   HF_TOKEN=hf_... ./deploy.sh <hf-username>/<space-name>
+   ```
+
+   (یا دستی: `hf repo create <user>/<space> --repo-type space --space-sdk gradio` و
+   `hf upload <user>/<space> ./ --repo-type space`.)
 3. در `Settings → Variables and secrets` این‌ها را اضافه کن:
 
    | نام | نوع | مقدار |
@@ -75,7 +88,8 @@ pinned: false
    `PROXY_TELEGRAM_ID` فقط برای امضای درخواست‌های `login` / `me` / `reset` است و
    دسترسی به داده نمی‌دهد؛ دسترسی هر کاربر با `telegramId` خودش بررسی می‌شود.
 
-4. Space را باز کن و با **یوزرنیم/رمز پنل** وارد شو.
+4. Space را باز کن و با **یوزرنیم/رمز پنل** وارد شو. (پنل مستقیماً در `/` باز
+   می‌شود؛ صفحهٔ Gradio در `/gradio` است.)
 
 ## عیب‌یابی
 
@@ -87,6 +101,7 @@ pinned: false
 | `تلاش‌های ورود زیاد است` | محدودیت ۱۲ تلاش در دقیقه | یک دقیقه صبر کن |
 | صفحهٔ سفید/کندی اول | Spaceهای رایگان می‌خوابند | صبر کن یا Space را Upgrade کن |
 | `BOT_TOKEN روی سرویس تنظیم نشده است` | Secret را ست نکردی | در Settings اضافه کن |
+| `Could not create share link` / اجرا نشدن | `gradio` نصب نیست | `requirements.txt` را کامل آپلود کن |
 
 ## امنیت
 
@@ -104,10 +119,13 @@ pinned: false
 cd hf-web-panel
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-BOT_TOKEN='123:test' SERVERLESS_ORIGIN='http://localhost:9000' uvicorn app:app --port 7860
+BOT_TOKEN='123:test' SERVERLESS_ORIGIN='http://localhost:9000' python app.py
 ```
 
-`GET /healthz` وضعیت و تنظیم بودن توکن را برمی‌گرداند.
+سپس:
+- `http://localhost:7860/` → پنل (از دامنهٔ تعیین‌شده پروکسی می‌شود)
+- `http://localhost:7860/gradio` → صفحهٔ وضعیت Gradio
+- `http://localhost:7860/healthz` → وضعیت و تنظیم بودن توکن
 
 ## نکته
 

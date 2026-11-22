@@ -1,7 +1,7 @@
 import { db, fetch } from 'sdk';
 import { eq, desc } from 'sdk/db';
 import { messages } from '../schema.js';
-import { getChat, touchChat, latestMessage, addMessage, findByTg } from './store.js';
+import { getChat, touchChat, latestMessage, addMessage, findByTg, getSettingsFor } from './store.js';
 import { sendText } from './tg.js';
 import { alertAdmins } from './notify.js';
 import { now, clip, faError } from './util.js';
@@ -50,13 +50,15 @@ async function callGemini(st, prompt, contents) {
 
 // بعد از اتمام سکوت صدا زده می‌شه. فقط اگر پیامِ من هنوز «آخرین پیام چت» باشه پاسخ می‌ده:
 // پیام جدیدتر مخاطب → همان فراخوانی جواب می‌ده؛ پیام جدیدتر خودت/پنل → AI ساکت می‌مونه.
-export async function runAi({ chatId, rowId, bizId, st }) {
+export async function runAi({ chatId, rowId, bizId }) {
   const latest = await latestMessage(chatId);
   if (!latest || latest.id !== rowId) {
     if (latest && latest.role !== 'user') await touchChat(chatId, { aiPendingUntil: 0 });
     return;
   }
   const chat = await getChat(chatId);
+  // کلید/مدل/پرامپت از صاحب همین چت خوانده می‌شود (override روی پیش‌فرض ادمین).
+  const st = await getSettingsFor(chat && chat.ownerId);
   if (!chat || !aiEnabled(chat, st)) { await touchChat(chatId, { aiPendingUntil: 0 }); return; }
 
   try {

@@ -14,7 +14,9 @@ tiny service sits in front of the same panel and:
     forwards every other ``/api/*`` call to the serverless origin.
 
 The bot token never leaves this process. Deploy it as a **private** Hugging Face
-Docker Space; see README.md.
+**Gradio SDK Space** (no Docker plan needed): Gradio serves a small landing page
+at ``/gradio`` and the same process mounts the panel proxy at ``/``; see
+README.md.
 """
 
 from __future__ import annotations
@@ -30,8 +32,10 @@ from typing import Optional
 from urllib.parse import quote, urlencode
 
 import httpx
+import gradio as gr
+import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse, Response
 
 # ─────────────────────────────── configuration ──────────────────────────────
 
@@ -253,6 +257,8 @@ async def api_proxy(name: str, request: Request):
         return await _finish_login(_result(r) or {})
 
     if name == "reset_password":
+        if _rate_limited(_client_ip(request)):
+            return envelope_error("تلاش‌های بازیابی زیاد است؛ یک دقیقه بعد دوباره امتحان کنید.", 429, "RATE_LIMITED")
         r = await call_origin("reset_password", payload, SIGNER_ID)
         if r is None or r.status_code != 200:
             return _forward(r)
@@ -263,6 +269,8 @@ async def api_proxy(name: str, request: Request):
         return _json_response({"ok": True, "result": res})
 
     if name == "request_password_reset":
+        if _rate_limited(_client_ip(request)):
+            return envelope_error("درخواست‌های بازیابی زیاد است؛ یک دقیقه بعد دوباره امتحان کنید.", 429, "RATE_LIMITED")
         r = await call_origin("request_password_reset", payload, SIGNER_ID)
         return _forward(r)
 
@@ -285,6 +293,45 @@ async def api_proxy(name: str, request: Request):
     if name == "logout":
         _sessions.pop(token, None)
     return _forward(r)
+
+
+# ───────────────────────────── Gradio landing page ─────────────────────────
+# Hugging Face runs this file for a "gradio" SDK Space. The Gradio UI is only a
+# small landing/status page; the panel itself is served by the proxy below at
+# `/`, so opening the Space URL lands directly on the real panel.
+with gr.Blocks(title="پل پنل وب تلگرام", theme=gr.themes.Soft()) as demo:
+    gr.Markdown(
+        """
+        # 🌐 پل پنل وب تلگرام
+        این Space فقط یک **پل** است: خودِ پنل و همهٔ داده‌ها روی
+        **Telegram Serverless** می‌مانند و این‌جا فقط درخواست‌ها را با
+        `initData` امضاشده به همان دامنه می‌فرستد.
+        """
+    )
+    gr.HTML(
+        '<a href="/" target="_top" '
+        'style="display:inline-block;padding:.8rem 1.6rem;border-radius:10px;'
+        'background:#4f46e5;color:#fff;font-weight:700;text-decoration:none">'
+        'ورود به پنل ←</a>'
+    )
+    gr.Markdown(
+        f"""
+        ---
+        **دامنهٔ سرورلس:** `{ORIGIN}`  
+        **وضعیت توکن ربات:** {'✅ تنظیم شده' if BOT_TOKEN else '❌ تنظیم نشده (Secret را اضافه کنید)'}  
+        **سلامت سرویس:** [`/healthz`](/healthz)
+        """
+    )
+
+
+app = gr.mount_gradio_app(app, demo, path="/gradio")
+
+
+@app.get("/gradio", include_in_schema=False)
+async def _gradio_redirect():
+    # `/gradio` (no trailing slash) would otherwise fall through to the panel
+    # catch-all route below, because Starlette Mount only returns a redirect.
+    return RedirectResponse(url="/gradio/", status_code=307)
 
 
 # ─────────────────────────────── static proxy ───────────────────────────────
@@ -335,3 +382,9 @@ async def _warn_missing_token():
         print("[web-bridge] WARNING: BOT_TOKEN is empty — API calls will fail.", flush=True)
     else:
         print(f"[web-bridge] origin={ORIGIN} signer_id={SIGNER_ID}", flush=True)
+
+
+if __name__ == "__main__":
+    # Hugging Face Spaces (gradio SDK) run `python app.py`; default port is 7860.
+    port = int(os.environ.get("PORT") or os.environ.get("GRADIO_SERVER_PORT") or 7860)
+    uvicorn.run(app, host="0.0.0.0", port=port)

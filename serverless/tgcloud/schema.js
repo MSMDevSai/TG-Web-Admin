@@ -11,10 +11,24 @@ export const members = table('members', {
   createdAt: integer('created_at'),
 });
 
-// تنظیمات کلی (key → value)
+// تنظیمات کلی (key → value) — پیش‌فرض‌هایی که ادمین برای همه تعیین می‌کند
 export const settings = table('settings', {
   key:   text('key').primaryKey(),
   value: json('value'),
+});
+
+// تنظیمات اختصاصی هر عضو (override روی پیش‌فرض‌های بالا).
+// ستون NULL یعنی «از پیش‌فرض ادمین استفاده کن»؛ برای همین هر عضو فقط چیزهایی
+// را ذخیره می‌کند که خودش تغییر داده است.
+export const memberSettings = table('member_settings', {
+  tgId:           integer('tg_id').primaryKey(),
+  geminiApiKey:   text('gemini_api_key').default(''),   // کلید اختصاصی Google AI Studio
+  geminiModel:    text('gemini_model'),                 // مدل دلخواه (null = پیش‌فرض)
+  systemPrompt:   text('system_prompt'),                // پرامپت اختصاصی (null = پیش‌فرض)
+  assistantLabel: text('assistant_label'),              // برچسب دستیار (null = پیش‌فرض)
+  aiMode:         text('ai_mode'),                      // 'on' | 'off' | null = پیش‌فرض
+  onboardedAt:    integer('onboarded_at'),              // اولین بار که ربات کلید را درخواست کرد
+  updatedAt:      integer('updated_at'),
 });
 
 // اتصال‌های Telegram Business: هر اتصال متعلق به یک اکانت (user_id)
@@ -25,11 +39,16 @@ export const connections = table('connections', {
   ts:      integer('ts'),
 });
 
+// ownerId = صاحب چت (آیدی عددی تلگرام). هر عضو فقط چت‌های خودش را می‌بیند؛
+// ادمین‌ها همه را می‌بینند. برای چت خصوصیِ ربات خودِ طرف، برای بیزینس صاحب
+// اتصال و برای گروه کسی که ربات را اضافه کرده است.
 export const chats = table('chats', {
   id:             integer('id').primaryKey(),
   title:          text('title').notNull().default(''),
   kind:           text('kind').default('private'),
   isGroup:        boolean('is_group').notNull().default(false),
+  ownerId:        integer('owner_id'),
+  ownerName:      text('owner_name').default(''),
   bizId:          text('biz_id'),
   hasBotChat:     boolean('has_bot_chat').notNull().default(false),
   muted:          boolean('muted').notNull().default(false),
@@ -41,7 +60,7 @@ export const chats = table('chats', {
   lastTs:         integer('last_ts').notNull().default(0),
   aiPendingUntil: integer('ai_pending_until').notNull().default(0),
   createdAt:      integer('created_at'),
-});
+}, (t) => ({ byOwner: index('idx_chats_owner').on(t.ownerId, t.lastTs) }));
 
 // همه‌ی پیام‌ها. هیچ‌وقت حذف نمی‌شن؛ حذف فقط deleted_at می‌زنه (حالت «کالکتور»).
 export const messages = table('messages', {

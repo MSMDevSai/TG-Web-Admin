@@ -2,6 +2,7 @@ import { db, EndpointError } from 'sdk';
 import { and, eq, lt, gt, desc, asc, isNotNull } from 'sdk/db';
 import { messages, reads } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { assertCanSee } from '../lib/scope.js';
 import { getChat } from '../lib/store.js';
 import { now } from '../lib/util.js';
 
@@ -11,6 +12,7 @@ export default async function (input, ctx) {
   const chatId = Number(input.chatId);
   const chat = await getChat(chatId);
   if (!chat) throw new EndpointError('چت پیدا نشد.');
+  assertCanSee(me, chat);
 
   const limit = Math.min(Math.max(Number(input.limit) || 60, 1), 200);
   const conds = [eq(messages.chatId, chatId)];
@@ -20,12 +22,16 @@ export default async function (input, ctx) {
 
   let rows, hasMoreOlder = false, hasMoreNewer = false;
   if (input.aroundId) {
-    // پرش به یک پیام (از نتیجه‌ی جستجو): ۴۰ پیام قبل و ۴۰ پیام بعد
+    // پرش به یک پیام (از نتیجه‌ی جستجو): ۴۰ پیام قبل و ۴۰ پیام بعد.
+    // فیلتر این‌جا اعمال نمی‌شود تا خودِ پیامِ هدف همیشه در خروجی باشد.
     const aid = Number(input.aroundId);
-    const before = await db.select().from(messages).where(and(eq(messages.chatId, chatId), lt(messages.id, aid))).orderBy(desc(messages.id)).limit(40).all();
-    const after = await db.select().from(messages).where(and(eq(messages.chatId, chatId), gt(messages.id, aid - 1))).orderBy(asc(messages.id)).limit(41).all();
-    hasMoreOlder = before.length === 40; hasMoreNewer = after.length === 41;
-    rows = [...before.reverse(), ...after.slice(0, 40 + (hasMoreNewer ? 0 : 1))];
+    const before = await db.select().from(messages).where(and(eq(messages.chatId, chatId), lt(messages.id, aid)))
+      .orderBy(desc(messages.id)).limit(41).all();
+    const after = await db.select().from(messages).where(and(eq(messages.chatId, chatId), gt(messages.id, aid - 1)))
+      .orderBy(asc(messages.id)).limit(42).all();
+    hasMoreOlder = before.length > 40;
+    hasMoreNewer = after.length > 41;
+    rows = [...before.slice(0, 40).reverse(), ...after.slice(0, 41)];
   } else {
     rows = (await db.select().from(messages).where(and(...conds)).orderBy(desc(messages.id)).limit(limit).all()).reverse();
     hasMoreOlder = rows.length === limit;
@@ -41,6 +47,7 @@ export default async function (input, ctx) {
 
   return {
     chat: { id: chat.id, title: chat.title, isGroup: chat.isGroup, kind: chat.kind, business: !!chat.bizId, direct: chat.hasBotChat,
+      ownerId: chat.ownerId || null, ownerName: chat.ownerName || '',
       muted: chat.muted, pinned: chat.pinned, aiMode: chat.aiMode, prompt: me.role === 'admin' ? chat.prompt : undefined,
       aiPending: chat.aiPendingUntil > now() },
     hasMore: hasMoreOlder, hasMoreNewer, around: !!input.aroundId,

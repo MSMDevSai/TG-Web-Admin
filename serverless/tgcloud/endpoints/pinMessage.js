@@ -2,6 +2,7 @@ import { api, db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { messages } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { assertCanWrite } from '../lib/scope.js';
 import { findByTg, getChat } from '../lib/store.js';
 import { now, faError } from '../lib/util.js';
 
@@ -14,6 +15,7 @@ export default async function (input, ctx) {
   const row = await findByTg(chatId, msgId);
   const chat = await getChat(chatId);
   if (!row || !chat) throw new EndpointError('پیام پیدا نشد.');
+  assertCanWrite(me, chat);
 
   await db.update(messages).set({ pinnedAt: pin ? now() : null }).where(eq(messages.id, row.id)).run();
 

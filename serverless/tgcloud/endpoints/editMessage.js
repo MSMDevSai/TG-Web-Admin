@@ -2,18 +2,20 @@ import { api, db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { messages, edits } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { assertCanWrite } from '../lib/scope.js';
 import { findByTg, getChat } from '../lib/store.js';
 import { now, faError } from '../lib/util.js';
 
 // ویرایش پیامی که از طرف ما رفته (متن قبلی در تاریخچه می‌مونه)
 export default async function (input, ctx) {
-  await requireMember(ctx);
+  const me = await requireMember(ctx);
   const chatId = Number(input.chatId), msgId = Number(input.msgId);
   const text = String(input.text || '').trim();
   if (!text) throw new EndpointError('متن خالی است.');
   const row = await findByTg(chatId, msgId);
   const chat = await getChat(chatId);
   if (!row || !chat) throw new EndpointError('پیام پیدا نشد.');
+  assertCanWrite(me, chat);
   if (row.role === 'user') throw new EndpointError('پیام مخاطب قابل ویرایش نیست.');
 
   const p = { chat_id: chatId, message_id: msgId };

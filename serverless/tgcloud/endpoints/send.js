@@ -2,6 +2,7 @@ import { api, db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { media } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { assertCanWrite, canAccessMedia } from '../lib/scope.js';
 import { getChat, touchChat, addMessage } from '../lib/store.js';
 import { sendText } from '../lib/tg.js';
 import { now, clip, faError } from '../lib/util.js';
@@ -28,10 +29,12 @@ export default async function (input, ctx) {
     if (!isNumeric && !isUsername) throw new EndpointError('شناسه‌ی چت نامعتبر است.');
   }
   if (mode === 'me' && chat && !chat.bizId) throw new EndpointError('این چت اتصال بیزینسی ندارد؛ حالت «ربات» را انتخاب کن.');
+  if (chat) assertCanWrite(me, chat);
 
   // ---------- استیکر / GIF با file_id (بدون آپلود دوباره) ----------
   if (mediaType) {
     if (!mediaKey) throw new EndpointError('رسانه انتخاب نشده.');
+    if (!(await canAccessMedia(me, mediaKey))) throw new EndpointError('این رسانه در دسترس نیست.');
     const row = await db.select().from(media).where(eq(media.key, mediaKey)).get();
     if (!row) throw new EndpointError('این استیکر/GIF در آرشیو نیست.');
     const method = mediaType === 'sticker' ? 'sendSticker' : 'sendAnimation';
@@ -72,11 +75,15 @@ export default async function (input, ctx) {
   // چت تازه: شناسه‌ی واقعی را از پاسخ تلگرام بگیر و ثبتش کن.
   const chatId = chat ? chat.id : Number(sent.chat && sent.chat.id) || numeric;
   if (!chat) {
+    const isGrp = !!(sent.chat && /group|supergroup|channel/.test(sent.chat.type || ''));
     await touchChat(chatId, {
       title: clip(String(input.customTitle || '').trim() || (sent.chat && sent.chat.title) || (sent.chat && sent.chat.username) || `چت ${chatId}`, 120),
       kind: (sent.chat && sent.chat.type) || 'private',
-      isGroup: !!(sent.chat && /group|supergroup|channel/.test(sent.chat.type || '')),
+      isGroup: isGrp,
       hasBotChat: true,
+      // چتی که از پنل شروع می‌شود به همان عضو تعلق دارد تا از دید خودش خارج نشود.
+      ownerId: me.id,
+      ownerName: me.name,
     });
   }
 

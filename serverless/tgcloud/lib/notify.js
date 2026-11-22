@@ -1,5 +1,6 @@
 import { api } from 'sdk';
 import { recipients, getSettings } from './store.js';
+import { ownerOf } from './scope.js';
 import { WEBAPP_URL } from './config.js';
 import { clip } from './util.js';
 
@@ -11,13 +12,17 @@ export function chatKeyboard(chatId, muted) {
 }
 
 // اعلان تلگرامی به اعضا (با رعایت سوییچ کلی، سوییچ هر عضو و بی‌صدا بودن چت)
+// اعلان هر چت فقط برای صاحب همان چت (و ادمین‌ها که همه را می‌بینند) می‌رود؛
+// وگرنه پیام‌های یک نفر برای بقیه لو می‌رفت.
 export async function notifyMembers(text, { chat, silentChat = false, plain = true } = {}) {
   const st = await getSettings();
   if (!st.notify_enabled) return;
   if (chat && chat.muted && !silentChat) return;
+  const ownerId = chat ? ownerOf(chat) : null;
   const list = await recipients();
   for (const m of list) {
     if (!m.notify) continue;
+    if (chat && ownerId && m.role !== 'admin' && Number(m.tgId) !== Number(ownerId)) continue;
     try {
       const p = { chat_id: m.tgId, text: clip(text, 3500) };
       if (chat) p.reply_markup = chatKeyboard(chat.id, !!chat.muted);

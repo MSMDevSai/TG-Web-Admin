@@ -2,6 +2,7 @@ import { api, db } from 'sdk';
 import { eq } from 'sdk/db';
 import { chats } from '../schema.js';
 import { memberRole } from '../lib/store.js';
+import { canSeeChat } from '../lib/scope.js';
 import { chatKeyboard } from '../lib/notify.js';
 import { anonCallback } from '../lib/anon.js';
 
@@ -14,6 +15,11 @@ export default async function (cq) {
   const [act, arg] = String(cq.data || '').split(':');
   const chatId = Number(arg);
   if ((act === 'mute' || act === 'unmute') && chatId) {
+    const chat = await db.select().from(chats).where(eq(chats.id, chatId)).get();
+    if (!chat || !canSeeChat({ id: cq.from.id, role }, chat)) {
+      await api.answerCallbackQuery({ callback_query_id: cq.id, text: 'این چت به حساب تو مربوط نیست.' });
+      return;
+    }
     const muted = act === 'mute';
     await db.update(chats).set({ muted }).where(eq(chats.id, chatId)).run();
     await api.answerCallbackQuery({ callback_query_id: cq.id, text: muted ? '🔕 اعلان این چت بسته شد' : '🔔 اعلان این چت باز شد' });

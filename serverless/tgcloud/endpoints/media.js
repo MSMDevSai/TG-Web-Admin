@@ -1,7 +1,8 @@
 import { db, api, EndpointError } from 'sdk';
-import { eq, and, desc, isNotNull } from 'sdk/db';
-import { media, messages } from '../schema.js';
+import { eq, sql } from 'sdk/db';
+import { media } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { canAccessMedia, visibleChatsSubSql } from '../lib/scope.js';
 import { b64encode } from '../lib/b64.js';
 import { getSettings } from '../lib/store.js';
 import { archiveMedia } from '../lib/media.js';
@@ -10,24 +11,28 @@ const CHUNK = 393216;   // ۳۸۴ کیلوبایت (مضرب ۳ → base64 تک�
 
 // بایت‌های رسانه‌ی ذخیره‌شده، تکه‌تکه. اگر ذخیره نشده بود و هنوز file_id معتبره، از تلگرام می‌گیره.
 export default async function (input, ctx) {
-  await requireMember(ctx);
+  const me = await requireMember(ctx);
 
-  // بدون key → لیست استیکرها/GIFهای اخیر برای پنل کامپوزر
+  // بدون key → لیست استیکرها/GIFهای اخیر برای پنل کامپوزر (فقط چت‌های مجاز)
   if (!input.key && (input.type === 'sticker' || input.type === 'animation')) {
-    const rows = await db.select().from(messages)
-      .where(and(eq(messages.type, input.type), isNotNull(messages.mediaKey)))
-      .orderBy(desc(messages.id)).limit(160).all();
+    const t = input.type === 'sticker' ? 'sticker' : 'animation';
+    const rows = await db.all(sql`
+      SELECT media_key, text FROM messages
+      WHERE type = ${t} AND media_key IS NOT NULL
+        AND chat_id IN (${visibleChatsSubSql(me)})
+      ORDER BY id DESC LIMIT 160`);
     const seen = new Set();
     return rows.filter((r) => {
-      if (seen.has(r.mediaKey)) return false;
-      seen.add(r.mediaKey); return true;
+      if (seen.has(r.media_key)) return false;
+      seen.add(r.media_key); return true;
     }).slice(0, 60).map((r) => ({
-      mediaKey: r.mediaKey, emoji: input.type === 'sticker' ? String(r.text || '') : '', kind: input.type,
+      mediaKey: r.media_key, emoji: t === 'sticker' ? String(r.text || '') : '', kind: t,
     }));
   }
 
   const key = String(input.key || '');
   const part = Math.max(0, Number(input.part) || 0);
+  if (!(await canAccessMedia(me, key))) throw new EndpointError('رسانه پیدا نشد.');
   let row = await db.select().from(media).where(eq(media.key, key)).get();
   if (!row) throw new EndpointError('رسانه پیدا نشد.');
 

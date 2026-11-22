@@ -99,6 +99,7 @@
         </div>
         <div class="sp-body">
           <div class="sp-list-row" onclick="openSettingsSub('ai')"><i class="bi bi-robot"></i><span>هوش مصنوعی</span><small id="spAiSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
+          <div class="sp-list-row" onclick="openSettingsSub('anon')"><i class="bi bi-eye-slash"></i><span>پیام ناشناس</span><small id="spAnonSummary"></small><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row" onclick="openSettingsSub('panel')"><i class="bi bi-person-gear"></i><span>پنل و اعلان‌ها</span><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row" onclick="openSettingsSub('about')"><i class="bi bi-info-circle"></i><span>درباره</span><i class="bi bi-chevron-left arrow"></i></div>
           <div class="sp-list-row owner-only d-none" onclick="openSettingsSub('members')"><i class="bi bi-people"></i><span>مدیریت اعضا</span><i class="bi bi-chevron-left arrow"></i></div>
@@ -114,23 +115,89 @@
         <div class="sp-body">
           <div class="sp-card">
             <div class="sp-row">
-              <label for="gAiToggle">فعال‌سازی کلی AI</label>
-              <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gAiToggle"></div>
-            </div>
-            <div class="sp-row">
-              <label>مدل زبانی</label>
-              <input id="gModel" class="sp-inp" style="width:200px" placeholder="gemini-2.5-flash">
-            </div>
-            <div class="sp-row">
-              <label>تأخیر پاسخ دسته‌ای (ثانیه)</label>
-              <input id="gDelay" type="number" class="sp-inp" style="width:80px" min="5" max="120">
+              <label>کلید من</label>
+              <small id="myKeyStatus" class="text-secondary">—</small>
             </div>
             <div>
-              <label class="form-label">پرامپت پیش‌فرض</label>
-              <textarea id="gPrompt" class="form-control" rows="6" placeholder="دستورالعمل مادر..."></textarea>
+              <label class="form-label">کلید Google AI Studio من</label>
+              <input id="myKey" type="password" class="form-control" dir="ltr" placeholder="AIza..." autocomplete="off">
+              <div class="text-secondary mt-1" style="font-size:.75rem">
+                از <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>
+                بگیر. اگر ثبت نشود، در صورت اجازهٔ ادمین از کلید پیش‌فرض استفاده می‌شود.
+              </div>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-primary flex-fill" onclick="saveMyKey()">ذخیرهٔ کلید</button>
+              <button class="btn btn-outline-secondary" onclick="clearMyKey()">حذف کلید</button>
             </div>
           </div>
-          <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+
+          <div class="sp-card mt-3">
+            <div class="sp-row">
+              <label>مدل من</label>
+              <select id="myModel" class="sp-inp" style="width:210px">
+                <option value="">پیش‌فرض ادمین</option>
+                <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
+              </select>
+            </div>
+            <div class="mt-2">
+              <label class="form-label">پرامپت اختصاصی من <span class="text-secondary">(خالی = پیش‌فرض ادمین)</span></label>
+              <textarea id="myPrompt" class="form-control" rows="6" placeholder="خالی بگذار تا از پرامپت پیش‌فرض ادمین استفاده شود"></textarea>
+            </div>
+            <div class="text-secondary mt-2" style="font-size:.75rem">
+              پیش‌فرض فعلی ادمین: <span id="myDefaults">—</span>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 mb-2 mt-3" onclick="saveMyAi()">ذخیرهٔ تنظیمات من</button>
+          <button class="btn btn-outline-secondary w-100 mb-3" onclick="resetMyAi()">برگشت به پیش‌فرض‌های ادمین</button>
+
+          <div class="owner-only d-none">
+            <div class="sp-card mt-4">
+              <div class="sp-row">
+                <label for="gAiToggle">فعال‌سازی کلی AI (پیش‌فرض)</label>
+                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gAiToggle"></div>
+              </div>
+              <div class="sp-row">
+                <label>مدل پیش‌فرض</label>
+                <input id="gModel" class="sp-inp" style="width:200px" placeholder="gemini-2.5-flash">
+              </div>
+              <div class="sp-row">
+                <label>تأخیر پاسخ دسته‌ای (ثانیه)</label>
+                <input id="gDelay" type="number" class="sp-inp" style="width:80px" min="5" max="120">
+              </div>
+              <div class="sp-row">
+                <label for="gShare">کلید پیش‌فرض را با اعضا به اشتراک بگذار</label>
+                <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="gShare"></div>
+              </div>
+              <div class="mt-2">
+                <label class="form-label">کلید پیش‌فرض Gemini (ادمین)</label>
+                <input id="gKey" type="password" class="form-control" dir="ltr" placeholder="AIza..." autocomplete="off">
+                <small id="gKeyStatus" class="text-secondary" style="font-size:.75rem"></small>
+                <button class="btn btn-outline-secondary btn-sm mt-2" onclick="clearDefaultKey()">حذف کلید پیش‌فرض</button>
+              </div>
+              <div class="mt-2">
+                <label class="form-label">پرامپت پیش‌فرض</label>
+                <textarea id="gPrompt" class="form-control" rows="6" placeholder="دستورالعمل مادر..."></textarea>
+              </div>
+            </div>
+            <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیرهٔ پیش‌فرض‌ها</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sp-view sp-sub" id="spAnon" style="display:none">
+        <div class="sp-hdr">
+          <button class="icon-btn" onclick="goBackOneLevel()"><i class="bi bi-arrow-right"></i></button>
+          <h5>پیام ناشناس</h5>
+        </div>
+        <div class="sp-body">
+          <div class="sp-card">
+            <div id="anonBody" class="text-secondary" style="font-size:.85rem">در حال بارگذاری…</div>
+          </div>
+          <button class="btn btn-primary w-100 mt-3 d-none" id="anonCreateBtn" onclick="createAnon()">ساخت لینک من</button>
         </div>
       </div>
 
@@ -146,7 +213,7 @@
               <input id="gPoll" type="number" class="sp-inp" style="width:100px" min="500">
             </div>
           </div>
-          <button class="btn btn-primary w-100 mb-3 mt-3" onclick="saveAllSettings()">ذخیره</button>
+          <button class="btn btn-primary w-100 mb-3 mt-3" onclick="savePanelPrefs()">ذخیره</button>
         </div>
       </div>
 
@@ -416,6 +483,7 @@
     <script src="/static/js/chatlist.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/composer.js"></script>
+    <script src="/static/js/settings.js"></script>
     <script>
     const QUICK_REACT = ["❤","👍","🔥","😁","😱","🤣"];
     const ALL_REACT = ["❤","👍","👎","🔥","🥰","👏","😁","🤔","🤯","😱","🤬","😢","🎉","🤩","🤮","💩","🙏","👌","🕊","🤡","🥱","🥴","😍","🐳","❤‍🔥","🌚","🌭","💯","🤣","⚡","🍌","🏆","💔","🤨","😐","🍓","🍾","💋","🖕","😈","😴","😭","🤓","👻","👨‍💻","👀","🎃","🙈","😇","😨","🤝","✍","🤗","🫡","🎅","🎄","☃","💅","🤪","🗿","🆒","💘","🙉","🦄","😘","💊","🙊","😎","👾","🤷‍♂","🤷","🤷‍♀","😡"];
@@ -535,9 +603,14 @@
 
     function initAppFromSession(res){
       S.me = { id: res.telegramId || 0, role: res.role, name: res.username, notify: true };
+      S.settings = {};
       pollMs = 3000;
+      applyRoleUi();
       finishSplash(false);
       startPoller();
+      loadAdminDefaults();
+      loadMyAi();
+      maybeOpenFromQuery();
     }
 
     // Dismiss the start-up splash. showAuth=true hands over to the sign-in card.
@@ -571,14 +644,14 @@
         S.me = r.me;
         S.settings = r.settings || {};
         document.getElementById('app').classList.remove('d-none');
-        document.getElementById('gAiToggle').checked = S.settings.ai_mode !== false;
-        document.getElementById('gPrompt').value = S.settings.system_prompt || '';
+        applyRoleUi();
+        applyAdminSettings(S.settings);
         document.getElementById('gPoll').value = localStorage.getItem('pollMs') || S.settings.poll_interval || 3000;
-        document.getElementById('gModel').value = S.settings.gemini_model || 'gemini-2.5-flash';
-        document.getElementById('gDelay').value = S.settings.ai_delay_seconds || 28;
         pollMs = Number(localStorage.getItem('pollMs')) || Number(S.settings.poll_interval) || 3000;
         finishSplash(false);
         startPoller();
+        loadMyAi();
+        maybeOpenFromQuery();
       }catch(e){
         const reason=(e&&(e.message||e.error))||'خطا در راه‌اندازی';
         if(IS_TELEGRAM){
@@ -647,7 +720,7 @@
     function updUBadge(){const u=document.getElementById('ubadge');if(unreadCnt>0){u.innerText=unreadCnt>99?'99+':unreadCnt;u.classList.remove('d-none')}else u.classList.add('d-none')}
     function updGlobalUnread(){let t=0;Object.values(unreadPer).forEach(v=>t+=v);document.title=t>0?`(${t}) پنل تلگرام`:'پنل تلگرام'}
 
-    const SP_SUBS=['spAi','spPanel','spMembers','spAbout'];
+    const SP_SUBS=['spAi','spAnon','spPanel','spMembers','spAbout'];
     function showSettingsMain(){
       document.getElementById('spMain').style.display='flex';
       SP_SUBS.forEach(id=>document.getElementById(id).style.display='none');
@@ -656,6 +729,8 @@
       const id='sp'+name.charAt(0).toUpperCase()+name.slice(1);
       document.getElementById('spMain').style.display='none';
       SP_SUBS.forEach(x=>document.getElementById(x).style.display=(x===id?'flex':'none'));
+      if(name==='ai')loadMyAi();
+      if(name==='anon')loadAnon();
       if(name==='about')refreshAboutPage();
       if(name==='members')loadMembers();
     }
@@ -672,40 +747,41 @@
     }
     async function refreshAiSummary(){
       try{
-        const r=await call('settings',{});
-        const s = r && r.settings ? r.settings : r;
+        const r=await call('mySettings',{op:'get'});
+        const s = r && r.settings ? r.settings : null;
         const el=document.getElementById('spAiSummary');
-        if(el&&s)el.textContent=s.ai_mode?'فعال':'غیرفعال';
-      }catch(e){/* فقط ادمین */}
+        if(el&&s)el.textContent=s.has_own_key?'کلید شخصی':(s.ai_mode?'پیش‌فرض':'غیرفعال');
+      }catch(e){/* ignore */}
     }
     async function refreshAboutPage(){
       try{
-        const r=await call('settings',{});
-        const s = r && r.settings ? r.settings : r;
+        const r=await call('mySettings',{op:'get'});
+        const s = r && r.settings ? r.settings : null;
         if(!s)return;
-        document.getElementById('spAboutModel').textContent=s.gemini_model||'—';
+        document.getElementById('spAboutModel').textContent=(s.gemini_model||'—')+(s.has_own_key?' · کلید شخصی':'');
         document.getElementById('spAboutAiState').textContent=s.ai_mode?'فعال':'غیرفعال';
-      }catch(e){/* فقط ادمین */}
+      }catch(e){/* ignore */}
     }
 
     async function saveAllSettings(){
-      const v=id=>document.getElementById(id).value;
-      const pollVal=Math.max(500,Math.min(parseInt(v('gPoll'))||3000,60000));
+      const pollVal=Math.max(500,Math.min(parseInt($val('gPoll'))||3000,60000));
       localStorage.setItem('pollMs',String(pollVal));
-      const body={
-        op:'save',
-        values:{
-          ai_mode:document.getElementById('gAiToggle').checked,
-          system_prompt:v('gPrompt'),
-          gemini_model:v('gModel').trim()||'gemini-2.5-flash',
-          ai_delay_seconds:parseFloat(v('gDelay'))||28,
-        },
-      };
-      let res=null;
-      try{ res=await call('settings',body); }catch(e){ showToast((e&&e.message)||'خطا در ذخیره','error',5000); return; }
-      if(!(res&&res.settings)){showToast(res?.error||'خطا در ذخیره','error',5000);return}
       pollMs=pollVal;startPoller();
-      showToast('تنظیمات ذخیره شد','success');goBackOneLevel();
+      const values={
+        ai_mode:document.getElementById('gAiToggle').checked,
+        system_prompt:$val('gPrompt'),
+        gemini_model:$val('gModel').trim()||'gemini-2.5-flash',
+        ai_delay_seconds:parseFloat($val('gDelay'))||28,
+        share_gemini_key:document.getElementById('gShare').checked,
+      };
+      const key=$val('gKey').trim();
+      if(key) values.gemini_api_key=key;
+      const r=await safeCall('settings',{op:'save',values});
+      if(!(r&&r.settings)){showToast((r&&(r.error||r.description))||r?.error||'خطا در ذخیره','error',5000);return}
+      S.settings=r.settings;
+      applyAdminSettings(r.settings);
+      loadMyAi();
+      showToast('پیش‌فرض‌ها ذخیره شد','success');goBackOneLevel();
     }
 
     async function loadMembers(){

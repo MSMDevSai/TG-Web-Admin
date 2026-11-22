@@ -1,5 +1,6 @@
 import { EndpointError } from 'sdk';
 import { requireMember } from '../lib/auth.js';
+import { assertCanWrite } from '../lib/scope.js';
 import { getChat, touchChat } from '../lib/store.js';
 
 // تنظیمات هر چت. pin/mute برای همه‌ی اعضا؛ aiMode/prompt فقط ادمین.
@@ -7,6 +8,7 @@ export default async function (input, ctx) {
   const me = await requireMember(ctx);
   const chat = await getChat(Number(input.chatId));
   if (!chat) throw new EndpointError('چت پیدا نشد.');
+  assertCanWrite(me, chat);
   const patch = {};
   if (typeof input.pinned === 'boolean') patch.pinned = input.pinned;
   if (typeof input.muted === 'boolean') patch.muted = input.muted;

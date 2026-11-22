@@ -1,5 +1,6 @@
 import { api, EndpointError } from 'sdk';
 import { requireMember } from '../lib/auth.js';
+import { assertCanWrite } from '../lib/scope.js';
 import { findByTg, getChat, touchChat, addMessage } from '../lib/store.js';
 import { now, clip, faError } from '../lib/util.js';
 
@@ -18,6 +19,7 @@ export default async function (input, ctx) {
   const srcId = Number(input.chatId);
   const src = await getChat(srcId);
   if (!src) throw new EndpointError('چت مبدأ پیدا نشد.');
+  assertCanWrite(me, src);
   const ids = [...new Set((Array.isArray(input.msgIds) ? input.msgIds : [input.msgId]).map(Number))].filter(Boolean).slice(0, 20);
   const tgts = (Array.isArray(input.targets) ? input.targets : []).slice(0, 10);
   if (!ids.length || !tgts.length) throw new EndpointError('پیام یا مقصدی انتخاب نشده.');
@@ -31,6 +33,8 @@ export default async function (input, ctx) {
   for (const t of tgts) {
     const target = await getChat(Number(t.chatId));
     if (!target) { results.push({ chatId: t.chatId, ok: false, error: 'چت پیدا نشد.' }); continue; }
+    try { assertCanWrite(me, target); }
+    catch (e) { results.push({ chatId: t.chatId, ok: false, error: e.message }); continue; }
     const mode = t.mode === 'me' && target.bizId && !target.isGroup ? 'me' : 'bot';
     let okCount = 0, error = null;
     for (const row of rows) {

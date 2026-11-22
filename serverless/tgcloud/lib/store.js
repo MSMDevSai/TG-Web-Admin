@@ -1,6 +1,6 @@
 import { db } from 'sdk';
 import { eq, and, desc, inArray } from 'sdk/db';
-import { settings, chats, messages, connections, members } from '../schema.js';
+import { settings, chats, messages, connections, members, memberSettings } from '../schema.js';
 import { DEFAULTS, BOOTSTRAP_ADMINS } from './config.js';
 import { clean, now } from './util.js';
 
@@ -16,6 +16,56 @@ export async function saveSettings(obj) {
     await db.insert(settings).values({ key: k, value: v })
       .onConflictDoUpdate({ target: settings.key, set: { value: v } }).run();
   }
+}
+
+// ─── تنظیمات اختصاصی هر عضو ───
+// پیش‌فرض‌ها در جدول settings (ادمین) هستند؛ هر عضو می‌تواند بعضی‌ها را برای
+// خودش override کند. ستون NULL = «پیش‌فرض ادمین».
+const USER_KEYS = {
+  gemini_model: 'geminiModel',
+  system_prompt: 'systemPrompt',
+  assistant_label: 'assistantLabel',
+  ai_mode: 'aiMode',
+};
+
+export async function getMemberSettings(tgId) {
+  const id = Number(tgId);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return (await db.select().from(memberSettings).where(eq(memberSettings.tgId, id)).get()) || null;
+}
+
+// فقط مقادیری که عضو واقعاً override کرده است (شکل کلیدهای settings)
+export function userOverrides(row) {
+  const out = {};
+  if (!row) return out;
+  for (const [k, col] of Object.entries(USER_KEYS)) {
+    const v = row[col];
+    if (v === null || v === undefined || v === '') continue;
+    out[k] = k === 'ai_mode' ? v === 'on' : v;
+  }
+  const key = String(row.geminiApiKey || '').trim();
+  if (key) out.gemini_api_key = key;
+  return out;
+}
+
+export async function saveMemberSettings(tgId, patch) {
+  const set = { ...clean(patch), updatedAt: now() };
+  await db.insert(memberSettings).values({ tgId: Number(tgId), ...set })
+    .onConflictDoUpdate({ target: memberSettings.tgId, set }).run();
+}
+
+// تنظیمات مؤثر برای صاحب یک چت/اکانت: پیش‌فرض ادمین + overrideهای خودش.
+// اگر share_gemini_key خاموش باشد، عضو بدون کلید از کلید ادمین استفاده نمی‌کند.
+export async function getSettingsFor(tgId) {
+  const st = await getSettings();
+  if (!tgId) return st;
+  const row = await getMemberSettings(tgId);
+  Object.assign(st, userOverrides(row));
+  if (st.share_gemini_key === false && !isBootstrap(Number(tgId)) &&
+      !String(row && row.geminiApiKey || '').trim()) {
+    st.gemini_api_key = '';
+  }
+  return st;
 }
 
 export async function getChat(id) {

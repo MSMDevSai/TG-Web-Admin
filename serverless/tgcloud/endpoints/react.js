@@ -2,12 +2,14 @@ import { api, db, EndpointError } from 'sdk';
 import { eq } from 'sdk/db';
 import { messages } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
-import { findByTg } from '../lib/store.js';
+import { assertCanWrite } from '../lib/scope.js';
+import { findByTg, getChat } from '../lib/store.js';
 import { faError } from '../lib/util.js';
 
 export default async function (input, ctx) {
-  await requireMember(ctx);
+  const me = await requireMember(ctx);
   const chatId = Number(input.chatId), msgId = Number(input.msgId);
+  assertCanWrite(me, await getChat(chatId));
   const row = await findByTg(chatId, msgId);
   if (!row) throw new EndpointError('پیام پیدا نشد.');
   const emoji = String(input.emoji || '');

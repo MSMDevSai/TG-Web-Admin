@@ -2,13 +2,14 @@ import { db, EndpointError } from 'sdk';
 import { eq, asc } from 'sdk/db';
 import { categories, chatCategories } from '../schema.js';
 import { requireMember } from '../lib/auth.js';
+import { assertCanSee } from '../lib/scope.js';
 import { getChat } from '../lib/store.js';
 import { now } from '../lib/util.js';
 
 // دسته‌بندی چت‌ها. ساخت/ویرایش/حذف/ترتیب: فقط ادمین · قرار دادن چت در دسته‌ها (assign): همه‌ی اعضا
 export default async function (input, ctx) {
   const op = input.op || 'list';
-  await requireMember(ctx, ['create', 'update', 'delete', 'reorder'].includes(op));
+  const me = await requireMember(ctx, ['create', 'update', 'delete', 'reorder'].includes(op));
   const all = async () => (await db.select().from(categories).orderBy(asc(categories.sort), asc(categories.id)).all());
 
   if (op === 'create') {
@@ -35,7 +36,9 @@ export default async function (input, ctx) {
     for (let i = 0; i < ids.length; i++) await db.update(categories).set({ sort: i }).where(eq(categories.id, ids[i])).run();
   } else if (op === 'assign') {
     const chatId = Number(input.chatId);
-    if (!(await getChat(chatId))) throw new EndpointError('چت پیدا نشد.');
+    const ch = await getChat(chatId);
+    if (!ch) throw new EndpointError('چت پیدا نشد.');
+    assertCanSee(me, ch);
     const valid = new Set((await all()).map((c) => c.id));
     const want = [...new Set((Array.isArray(input.categoryIds) ? input.categoryIds : []).map(Number))].filter((id) => valid.has(id));
     await db.delete(chatCategories).where(eq(chatCategories.chatId, chatId)).run();

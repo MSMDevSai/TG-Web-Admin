@@ -4,6 +4,16 @@ import { db } from 'sdk';
 import { media } from '../schema.js';
 import { now } from './util.js';
 
+// تشخیص ساده‌ی MIME از چند بایت اول (عکس پروفایل معمولاً JPEG است)
+export function mimeOf(u8) {
+  if (!u8 || u8.length < 4) return 'application/octet-stream';
+  if (u8[0] === 0xff && u8[1] === 0xd8) return 'image/jpeg';
+  if (u8[0] === 0x89 && u8[1] === 0x50 && u8[2] === 0x4e && u8[3] === 0x47) return 'image/png';
+  if (u8[0] === 0x47 && u8[1] === 0x49 && u8[2] === 0x46) return 'image/gif';
+  if (u8[0] === 0x52 && u8[1] === 0x49 && u8[8] === 0x57 && u8[9] === 0x45) return 'image/webp';
+  return 'image/jpeg';
+}
+
 // نوع و file_id رسانه‌ی یک پیام تلگرام
 export function describeMedia(m) {
   if (m.photo && m.photo.length) {
